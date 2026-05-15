@@ -1,0 +1,2987 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#1a1a1a">
+<meta name="description" content="Offline class attendance management for professors. Privacy-first, works without internet.">
+<title>Class Register</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #faf8f5;
+  --bg-soft: #f3efe8;
+  --surface: #ffffff;
+  --ink: #1a1a1a;
+  --ink-soft: #4a4a4a;
+  --ink-muted: #8a8a8a;
+  --line: #e8e3da;
+  --accent: #8b3a2a;
+  --accent-soft: #f4ebe7;
+  --present: #2d6a4f;
+  --present-soft: #d8e9e0;
+  --absent: #a23e3e;
+  --absent-soft: #f3dede;
+  --warn: #b8860b;
+  --warn-soft: #f5eed5;
+  --info: #2c5282;
+  --info-soft: #d6e4f0;
+  --shadow: 0 1px 2px rgba(0,0,0,0.04), 0 4px 16px rgba(0,0,0,0.04);
+  --radius: 14px;
+  --radius-sm: 10px;
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: 'Inter', -apple-system, sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior: none;
+}
+
+body {
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding-bottom: 80px;
+}
+
+.serif { font-family: 'Fraunces', Georgia, serif; font-optical-sizing: auto; }
+
+/* PIN LOCK SCREEN */
+.lock-screen {
+  position: fixed;
+  inset: 0;
+  background: var(--bg);
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+}
+.lock-screen .brand { font-size: 32px; margin-bottom: 8px; }
+.lock-sub { color: var(--ink-muted); margin-bottom: 40px; font-size: 14px; }
+.pin-input {
+  font-size: 28px !important;
+  text-align: center;
+  letter-spacing: 12px;
+  font-family: 'Fraunces', serif !important;
+  font-weight: 500;
+  padding: 14px !important;
+  max-width: 240px;
+  margin: 0 auto 16px;
+}
+.pin-keypad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  max-width: 280px;
+  margin: 0 auto;
+}
+.pin-key {
+  height: 64px;
+  font-family: 'Fraunces', serif;
+  font-size: 24px;
+  font-weight: 500;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  cursor: pointer;
+}
+.pin-key:active { background: var(--bg-soft); }
+.pin-key.action { background: var(--bg-soft); border: none; font-family: Inter; font-size: 14px; font-weight: 600; color: var(--ink-soft); }
+
+/* HEADER */
+header {
+  padding: 18px 20px 14px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--line);
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  backdrop-filter: blur(8px);
+  background: rgba(250,248,245,0.92);
+}
+.header-row { display: flex; align-items: center; justify-content: space-between; }
+.brand {
+  font-family: 'Fraunces', serif;
+  font-weight: 600;
+  font-size: 22px;
+  letter-spacing: -0.02em;
+}
+.brand .dot { color: var(--accent); }
+.date-label {
+  font-size: 12px;
+  color: var(--ink-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 500;
+}
+
+/* CONTAINER */
+.container { padding: 14px; max-width: 720px; margin: 0 auto; }
+
+/* BANNER */
+.banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  margin-bottom: 12px;
+  font-size: 13px;
+  border: 1px solid;
+}
+.banner.warn { background: var(--warn-soft); border-color: #d4b85a; color: #6b5a14; }
+.banner.info { background: var(--info-soft); border-color: #9bb5d4; color: var(--info); }
+.banner.good { background: var(--present-soft); border-color: #9bbfaa; color: var(--present); }
+.banner-msg { flex: 1; }
+.banner button { padding: 6px 12px; font-size: 12px; min-height: 32px; background: transparent; border: 1px solid currentColor; color: inherit; }
+.banner-close { background: transparent; border: none; padding: 4px; min-height: auto; font-size: 18px; color: inherit; }
+
+/* CARDS */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 12px;
+  box-shadow: var(--shadow);
+}
+.card h2 {
+  font-family: 'Fraunces', serif;
+  font-weight: 500;
+  font-size: 20px;
+  margin: 0 0 12px;
+  letter-spacing: -0.01em;
+}
+.card h3 {
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-muted);
+  margin: 0 0 10px;
+}
+
+/* STATS DASHBOARD */
+.stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.stat {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 14px;
+}
+.stat-label {
+  font-size: 11px;
+  color: var(--ink-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+.stat-value {
+  font-family: 'Fraunces', serif;
+  font-size: 28px;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+.stat-value .unit { font-size: 14px; color: var(--ink-muted); margin-left: 4px; }
+
+/* BUTTONS */
+button, .btn {
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 500;
+  padding: 12px 18px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+}
+button:active { transform: scale(0.98); }
+.btn-primary {
+  background: var(--ink);
+  color: var(--bg);
+  border-color: var(--ink);
+}
+.btn-primary:active { background: var(--accent); border-color: var(--accent); }
+.btn-accent {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+}
+.btn-ghost { background: transparent; border-color: var(--line); }
+.btn-danger { color: var(--absent); border-color: var(--absent-soft); background: var(--absent-soft); }
+.btn-block { width: 100%; }
+.btn-sm { padding: 8px 14px; font-size: 13px; min-height: 36px; }
+
+/* FORM */
+label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-muted);
+  margin-bottom: 6px;
+}
+input, select, textarea {
+  width: 100%;
+  font-family: inherit;
+  font-size: 15px;
+  padding: 11px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--ink);
+  appearance: none;
+  -webkit-appearance: none;
+}
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--ink);
+}
+select {
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3e%3cpath fill='%231a1a1a' d='M6 8L0 0h12z'/%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  padding-right: 36px;
+}
+.field { margin-bottom: 12px; }
+.field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.field-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+
+/* STUDENT LIST FOR ATTENDANCE */
+.student-list { display: flex; flex-direction: column; gap: 6px; }
+.student-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  transition: all 0.15s ease;
+}
+.student-row.present { background: var(--present-soft); border-color: #b9d8c7; }
+.student-row.absent { background: var(--absent-soft); border-color: #e3bdbd; }
+.student-roll {
+  font-family: 'Fraunces', serif;
+  font-weight: 600;
+  font-size: 16px;
+  min-width: 32px;
+  color: var(--ink-soft);
+}
+.student-name {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.3;
+}
+.mark-btns { display: flex; gap: 4px; }
+.mark-btn {
+  width: 38px;
+  height: 38px;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 14px;
+  padding: 0;
+  min-height: 38px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+.mark-btn.p-btn.active { background: var(--present); color: white; border-color: var(--present); }
+.mark-btn.a-btn.active { background: var(--absent); color: white; border-color: var(--absent); }
+.note-btn {
+  width: 32px;
+  height: 38px;
+  padding: 0;
+  font-size: 16px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  border-radius: 8px;
+}
+.note-btn.has-note { background: var(--warn-soft); border-color: #d4b85a; }
+
+/* BULK / SEARCH BAR */
+.bulk-bar {
+  display: flex;
+  gap: 6px;
+  padding: 8px;
+  background: var(--bg-soft);
+  border-radius: var(--radius-sm);
+  margin-bottom: 10px;
+}
+.bulk-bar button { flex: 1; font-size: 12px; padding: 8px 6px; min-height: 36px; }
+
+.search-box {
+  position: relative;
+  margin-bottom: 10px;
+}
+.search-box input { padding-left: 38px; }
+.search-box::before {
+  content: '🔍';
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 14px;
+  opacity: 0.5;
+}
+
+/* TABS */
+.tabs {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  background: var(--bg-soft);
+  border-radius: 12px;
+  margin-bottom: 14px;
+}
+.tab {
+  flex: 1;
+  padding: 9px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 9px;
+  cursor: pointer;
+  color: var(--ink-muted);
+  border: none;
+  background: transparent;
+  transition: all 0.2s ease;
+  min-height: 38px;
+}
+.tab.active { background: var(--surface); color: var(--ink); box-shadow: var(--shadow); }
+
+/* MARK MODE TOGGLE */
+.mode-toggle {
+  display: flex;
+  background: var(--bg-soft);
+  border-radius: 10px;
+  padding: 3px;
+  margin-bottom: 12px;
+}
+.mode-toggle button {
+  flex: 1;
+  padding: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  min-height: 36px;
+  color: var(--ink-muted);
+}
+.mode-toggle button.active { background: var(--ink); color: var(--bg); }
+
+/* ROLL INPUT MODE */
+.roll-input-box {
+  font-family: 'Courier New', monospace !important;
+  font-size: 16px !important;
+  line-height: 1.6;
+  min-height: 120px;
+  resize: vertical;
+}
+.roll-help {
+  font-size: 12px;
+  color: var(--ink-muted);
+  margin-top: 6px;
+  line-height: 1.5;
+}
+.roll-preview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 10px;
+  padding: 10px;
+  background: var(--bg-soft);
+  border-radius: 8px;
+  min-height: 40px;
+}
+.roll-preview .chip { font-size: 11px; padding: 3px 8px; }
+
+/* BOTTOM NAV */
+nav.bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--surface);
+  border-top: 1px solid var(--line);
+  display: flex;
+  padding: 8px 4px calc(8px + env(safe-area-inset-bottom));
+  z-index: 100;
+  box-shadow: 0 -2px 12px rgba(0,0,0,0.04);
+}
+.nav-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 4px;
+  background: transparent;
+  border: none;
+  color: var(--ink-muted);
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  border-radius: 8px;
+  min-height: 50px;
+}
+.nav-item.active { color: var(--accent); }
+.nav-item svg { width: 22px; height: 22px; }
+
+/* MODAL */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.4);
+  display: none;
+  align-items: flex-end;
+  z-index: 200;
+  animation: fadeIn 0.2s ease;
+}
+.modal-overlay.show { display: flex; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+.modal {
+  background: var(--bg);
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
+  border-radius: 20px 20px 0 0;
+  padding: 20px;
+  max-height: 90vh;
+  overflow-y: auto;
+  animation: slideUp 0.25s ease;
+  position: relative;
+}
+@keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+.modal h3 {
+  font-family: 'Fraunces', serif;
+  font-size: 20px;
+  font-weight: 500;
+  margin: 0 0 14px;
+  text-transform: none;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+.modal-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: var(--bg-soft);
+  border: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  padding: 0;
+  font-size: 18px;
+  min-height: 32px;
+}
+
+/* HISTORY LIST */
+.history-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  margin-bottom: 8px;
+  cursor: pointer;
+}
+.history-meta { flex: 1; }
+.history-title { font-weight: 600; font-size: 15px; margin-bottom: 2px; }
+.history-sub { font-size: 12px; color: var(--ink-muted); }
+.history-stat {
+  text-align: right;
+  font-family: 'Fraunces', serif;
+  font-size: 16px;
+  font-weight: 500;
+}
+.history-stat .small { font-size: 11px; color: var(--ink-muted); font-family: 'Inter', sans-serif; }
+
+/* REPORT */
+.report-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  margin-bottom: 6px;
+}
+.report-row.defaulter { background: var(--absent-soft); border-color: #e3bdbd; }
+.report-pct {
+  font-family: 'Fraunces', serif;
+  font-weight: 600;
+  font-size: 16px;
+  min-width: 56px;
+  text-align: right;
+}
+.report-pct.bad { color: var(--absent); }
+.report-pct.good { color: var(--present); }
+
+/* COMPARE BARS */
+.compare-row {
+  display: grid;
+  grid-template-columns: 80px 1fr 56px;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+.compare-label { font-size: 13px; font-weight: 500; }
+.compare-bar-track {
+  height: 18px;
+  background: var(--bg-soft);
+  border-radius: 9px;
+  overflow: hidden;
+  position: relative;
+}
+.compare-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--present) 0%, var(--present) 100%);
+  border-radius: 9px;
+  transition: width 0.4s ease;
+}
+.compare-bar-fill.bad { background: var(--absent); }
+.compare-bar-fill.warn { background: var(--warn); }
+.compare-pct {
+  font-family: 'Fraunces', serif;
+  font-weight: 600;
+  font-size: 15px;
+  text-align: right;
+}
+
+/* TIMETABLE */
+.day-row {
+  display: grid;
+  grid-template-columns: 80px 1fr;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+  align-items: start;
+}
+.day-row:last-child { border-bottom: none; }
+.day-label {
+  font-family: 'Fraunces', serif;
+  font-weight: 600;
+  font-size: 14px;
+  padding-top: 4px;
+}
+.day-slots { display: flex; flex-direction: column; gap: 6px; }
+.slot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--bg-soft);
+  border-radius: 8px;
+  font-size: 13px;
+}
+.slot-time { font-weight: 600; min-width: 60px; }
+.slot-info { flex: 1; }
+.slot-info-time { font-weight: 600; font-size: 12px; }
+.slot-info-sub { font-size: 11px; color: var(--ink-muted); }
+.slot-actions { display: flex; gap: 4px; }
+.slot-actions button { padding: 4px 8px; font-size: 11px; min-height: 28px; }
+
+/* EMPTY STATE */
+.empty {
+  text-align: center;
+  padding: 36px 20px;
+  color: var(--ink-muted);
+}
+.empty .serif { font-size: 18px; margin-bottom: 6px; color: var(--ink-soft); }
+
+/* TOAST */
+.toast {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--ink);
+  color: var(--bg);
+  padding: 10px 18px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 500;
+  z-index: 1000;
+  opacity: 0;
+  transition: opacity 0.2s;
+  pointer-events: none;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+  max-width: 90vw;
+  text-align: center;
+}
+.toast.show { opacity: 1; }
+
+/* HIDDEN */
+.hidden { display: none !important; }
+
+/* HORIZ DIVIDER */
+.divider { height: 1px; background: var(--line); margin: 12px 0; }
+
+/* CHIP */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  background: var(--bg-soft);
+  color: var(--ink-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.chip.green { background: var(--present-soft); color: var(--present); }
+.chip.red { background: var(--absent-soft); color: var(--absent); }
+.chip.warn { background: var(--warn-soft); color: #6b5a14; }
+.chip.info { background: var(--info-soft); color: var(--info); }
+
+/* LIST ITEM */
+.list-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  margin-bottom: 6px;
+}
+.list-item-name { flex: 1; font-size: 14px; }
+.list-item-actions { display: flex; gap: 6px; }
+.icon-btn {
+  width: 32px; height: 32px;
+  padding: 0; min-height: 32px;
+  border-radius: 8px;
+  background: var(--bg-soft);
+  border: none;
+  font-size: 14px;
+}
+
+/* QUICK ACTION BUTTONS HOME */
+.quick-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.quick-actions button { padding: 14px 10px; font-size: 13px; }
+
+/* TODAY'S SCHEDULE */
+.today-slot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  background: var(--bg-soft);
+  border-radius: 10px;
+  margin-bottom: 6px;
+  cursor: pointer;
+}
+.today-slot.done { opacity: 0.5; background: var(--present-soft); }
+.today-time {
+  font-family: 'Fraunces', serif;
+  font-weight: 600;
+  font-size: 14px;
+  min-width: 70px;
+}
+.today-info { flex: 1; }
+.today-info-subj { font-weight: 600; font-size: 14px; }
+.today-info-meta { font-size: 11px; color: var(--ink-muted); }
+
+@media print {
+  body { background: white; padding: 0; }
+  header, nav.bottom-nav, .no-print { display: none !important; }
+  .card { box-shadow: none; border: 1px solid #ccc; page-break-inside: avoid; }
+  .container { padding: 20px; max-width: none; }
+}
+</style>
+</head>
+<body>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<!-- PIN LOCK -->
+<div class="lock-screen hidden" id="lock-screen">
+  <div class="brand serif">Class Register<span class="dot" style="color:var(--accent);">.</span></div>
+  <div class="lock-sub">Enter PIN to unlock</div>
+  <input type="password" class="pin-input" id="pin-input" inputmode="numeric" maxlength="6" readonly>
+  <div class="pin-keypad" id="pin-keypad"></div>
+</div>
+
+<!-- HEADER -->
+<header>
+  <div class="header-row">
+    <div class="brand">Class Register<span class="dot">.</span></div>
+    <div class="date-label" id="today-label"></div>
+  </div>
+</header>
+
+<div class="container">
+
+  <!-- BACKUP REMINDER BANNER -->
+  <div id="banner-area"></div>
+
+  <!-- HOME TAB -->
+  <section id="tab-home">
+    <div class="card">
+      <h3>At a glance</h3>
+      <div class="stats-grid">
+        <div class="stat">
+          <div class="stat-label">Students</div>
+          <div class="stat-value" id="stat-students">0</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Lectures Held</div>
+          <div class="stat-value" id="stat-lectures">0</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Avg Attendance</div>
+          <div class="stat-value"><span id="stat-avg">—</span><span class="unit">%</span></div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Defaulters</div>
+          <div class="stat-value" id="stat-defaulters">0</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 class="serif">Today's Schedule</h2>
+      <div id="today-schedule"></div>
+    </div>
+
+    <div class="card">
+      <h2 class="serif">Quick Actions</h2>
+      <div class="quick-actions">
+        <button class="btn btn-primary" onclick="goToMark()">+ Mark Attendance</button>
+        <button class="btn btn-ghost" onclick="navTo('reports')">View Reports</button>
+        <button class="btn btn-ghost" onclick="navTo('compare')">Compare</button>
+        <button class="btn btn-ghost" onclick="navTo('search')">Find Student</button>
+      </div>
+      <div class="divider"></div>
+      <h3>Recent Lectures</h3>
+      <div id="recent-list"></div>
+    </div>
+  </section>
+
+  <!-- MARK ATTENDANCE TAB -->
+  <section id="tab-mark" class="hidden">
+    <div class="card">
+      <h2 class="serif">Mark Attendance</h2>
+      <div class="field-row">
+        <div class="field">
+          <label>Date</label>
+          <input type="date" id="mark-date">
+        </div>
+        <div class="field">
+          <label>Division</label>
+          <select id="mark-div">
+            <option value="A">Division A</option>
+            <option value="B">Division B</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label>Subject / Lecture</label>
+        <select id="mark-subject"></select>
+      </div>
+      <div class="field">
+        <label>Lecture Time (optional)</label>
+        <input type="text" id="mark-time" placeholder="e.g. 10:00 - 11:00 AM">
+      </div>
+    </div>
+
+    <div class="mode-toggle">
+      <button id="mode-tap" class="active" onclick="setMarkMode('tap')">Tap Mode</button>
+      <button id="mode-roll" onclick="setMarkMode('roll')">Roll Number Mode</button>
+    </div>
+
+    <!-- TAP MODE -->
+    <div id="tap-mode-section" class="card">
+      <div class="search-box">
+        <input type="text" id="mark-search" placeholder="Search student..." oninput="filterMarkList()">
+      </div>
+      <div class="bulk-bar">
+        <button onclick="bulkMark('P')" class="btn-ghost">All Present</button>
+        <button onclick="bulkMark('A')" class="btn-ghost">All Absent</button>
+        <button onclick="bulkMark('')" class="btn-ghost">Clear</button>
+      </div>
+      <div style="font-size:12px;color:var(--ink-muted);margin-bottom:8px;">
+        <span id="mark-summary">0 marked</span>
+      </div>
+      <div id="mark-list" class="student-list"></div>
+    </div>
+
+    <!-- ROLL MODE -->
+    <div id="roll-mode-section" class="card hidden">
+      <div class="field">
+        <label>Absent Roll Numbers</label>
+        <textarea class="roll-input-box" id="roll-absent" placeholder="Type absent roll numbers (everyone else marked Present)&#10;&#10;Examples:&#10;3, 7, 12&#10;3 7 12&#10;3-7, 12  (range supported)" oninput="updateRollPreview()"></textarea>
+        <div class="roll-help">
+          Type absent roll numbers separated by spaces, commas, or use ranges like <strong>3-7</strong>. Everyone not listed will be marked Present.
+        </div>
+      </div>
+      <div>
+        <label>Preview</label>
+        <div class="roll-preview" id="roll-preview"></div>
+      </div>
+    </div>
+
+    <button class="btn btn-accent btn-block" onclick="saveAttendance()" style="margin-bottom: 12px;">Save Attendance</button>
+    <button class="btn btn-ghost btn-block" onclick="navTo('home')">Cancel</button>
+  </section>
+
+  <!-- HISTORY TAB -->
+  <section id="tab-history" class="hidden">
+    <div class="card">
+      <h2 class="serif">Lecture History</h2>
+      <div class="field-row">
+        <div class="field">
+          <label>Filter Division</label>
+          <select id="hist-div" onchange="renderHistory()">
+            <option value="">All</option>
+            <option value="A">Division A</option>
+            <option value="B">Division B</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Filter Subject</label>
+          <select id="hist-subj" onchange="renderHistory()">
+            <option value="">All</option>
+          </select>
+        </div>
+      </div>
+      <div id="history-list"></div>
+    </div>
+  </section>
+
+  <!-- REPORTS TAB -->
+  <section id="tab-reports" class="hidden">
+    <div class="card">
+      <h2 class="serif">Attendance Report</h2>
+      <div class="field-row">
+        <div class="field">
+          <label>Division</label>
+          <select id="rep-div" onchange="renderReport()">
+            <option value="A">Division A</option>
+            <option value="B">Division B</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Subject</label>
+          <select id="rep-subj" onchange="renderReport()">
+            <option value="">All Subjects</option>
+          </select>
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>From Date (optional)</label>
+          <input type="date" id="rep-from" onchange="renderReport()">
+        </div>
+        <div class="field">
+          <label>To Date (optional)</label>
+          <input type="date" id="rep-to" onchange="renderReport()">
+        </div>
+      </div>
+      <div class="field">
+        <label>Defaulter Threshold (%)</label>
+        <input type="number" id="rep-threshold" min="0" max="100" value="75" onchange="saveThreshold(); renderReport();">
+      </div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 12px;">
+        <button class="btn btn-ghost btn-sm" onclick="exportCSV()">📄 Summary CSV</button>
+        <button class="btn btn-ghost btn-sm" onclick="exportDetailedCSV()">📊 Detailed CSV</button>
+        <button class="btn btn-primary btn-sm" onclick="exportPDF()">📑 Formal PDF</button>
+        <button class="btn btn-ghost btn-sm" onclick="exportDefaulterPDF()">⚠️ Defaulter PDF</button>
+      </div>
+      <div id="report-summary"></div>
+      <div class="divider"></div>
+      <div id="report-list"></div>
+    </div>
+  </section>
+
+  <!-- COMPARE TAB -->
+  <section id="tab-compare" class="hidden">
+    <div class="card">
+      <h2 class="serif">Compare Attendance</h2>
+      <div class="tabs">
+        <button class="tab active" data-cmp="div" onclick="switchCompare('div')">Divisions</button>
+        <button class="tab" data-cmp="subj" onclick="switchCompare('subj')">Subjects</button>
+        <button class="tab" data-cmp="month" onclick="switchCompare('month')">Months</button>
+      </div>
+      <div id="compare-content"></div>
+    </div>
+  </section>
+
+  <!-- SEARCH TAB -->
+  <section id="tab-search" class="hidden">
+    <div class="card">
+      <h2 class="serif">Find a Student</h2>
+      <div class="search-box">
+        <input type="text" id="search-input" placeholder="Type any part of student name..." oninput="renderSearch()">
+      </div>
+      <div id="search-results"></div>
+    </div>
+  </section>
+
+  <!-- TIMETABLE TAB -->
+  <section id="tab-timetable" class="hidden">
+    <div class="card">
+      <h2 class="serif">Weekly Timetable</h2>
+      <p style="font-size:12px;color:var(--ink-muted);margin:0 0 12px;">
+        Set up your weekly schedule. The home screen will show today's lectures and let you mark attendance with one tap.
+      </p>
+      <div id="timetable-content"></div>
+      <button class="btn btn-primary btn-block" onclick="openAddSlotModal()" style="margin-top:10px;">+ Add Lecture Slot</button>
+    </div>
+  </section>
+
+  <!-- SETTINGS TAB -->
+  <section id="tab-settings" class="hidden">
+    <div class="card">
+      <h2 class="serif">Backup &amp; Sync</h2>
+      <p style="font-size: 13px; color: var(--ink-muted); margin: 0 0 12px;">
+        Pick a folder once. The app will auto-save backups there every time you mark attendance. Put it inside a Google Drive sync folder for automatic cloud backup.
+      </p>
+      <div id="auto-backup-status" style="margin-bottom: 12px;"></div>
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        <button class="btn btn-primary btn-block" onclick="setupAutoBackup()">📁 Set Auto-Backup Folder</button>
+        <button class="btn btn-ghost btn-block" onclick="exportBackup()">⬇ Download Manual Backup</button>
+        <button class="btn btn-ghost btn-block" onclick="shareBackup()">📤 Share Backup (to Drive/Email)</button>
+        <label class="btn btn-ghost btn-block" style="cursor: pointer;">
+          ⬆ Restore from Backup
+          <input type="file" accept=".json" onchange="restoreBackup(event)" style="display: none;">
+        </label>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 class="serif">Subjects</h2>
+      <div class="field">
+        <label>Add a new subject</label>
+        <div style="display: flex; gap: 8px;">
+          <input type="text" id="new-subject" placeholder="e.g. Data Structures">
+          <button class="btn btn-primary" onclick="addSubject()">Add</button>
+        </div>
+      </div>
+      <div id="subjects-list"></div>
+    </div>
+
+    <div class="card">
+      <h2 class="serif">Students</h2>
+      <div class="tabs">
+        <button class="tab active" data-stud-div="A" onclick="switchStudentDiv('A')">Division A</button>
+        <button class="tab" data-stud-div="B" onclick="switchStudentDiv('B')">Division B</button>
+      </div>
+      <div class="field">
+        <label>Add Student to <span id="add-stud-div">A</span></label>
+        <div style="display: flex; gap: 8px;">
+          <input type="text" id="new-student" placeholder="Full name">
+          <button class="btn btn-primary" onclick="addStudent()">Add</button>
+        </div>
+      </div>
+      <button class="btn btn-ghost btn-sm btn-block" onclick="openBulkImportModal()" style="margin-bottom:10px;">📋 Bulk Import (Paste List)</button>
+      <div id="students-list"></div>
+    </div>
+
+    <div class="card">
+      <h2 class="serif">Security</h2>
+      <p style="font-size:13px;color:var(--ink-muted);margin:0 0 12px;">
+        Set a 4-digit PIN to protect student data. You'll be asked for it each time the app opens.
+      </p>
+      <div id="pin-status"></div>
+    </div>
+
+    <div class="card">
+      <h2 class="serif">Danger Zone</h2>
+      <button class="btn btn-danger btn-block" onclick="clearAllData()">Clear All Data</button>
+    </div>
+
+    <div class="card">
+      <h3>About</h3>
+      <p style="font-size: 13px; color: var(--ink-muted); margin: 0;">
+        Class Register v2 stores all data locally on this device. No internet connection is required. No data leaves your phone unless you share a backup.
+      </p>
+    </div>
+  </section>
+</div>
+
+<!-- NOTE MODAL -->
+<div class="modal-overlay" id="note-modal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeNoteModal()">×</button>
+    <h3>Remark for <span id="note-student-name"></span></h3>
+    <textarea id="note-text" rows="4" placeholder="e.g. Late by 10 mins, medical leave note submitted..."></textarea>
+    <div style="display: flex; gap: 8px; margin-top: 12px;">
+      <button class="btn btn-ghost" onclick="closeNoteModal()" style="flex:1;">Cancel</button>
+      <button class="btn btn-primary" onclick="saveNote()" style="flex:1;">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- HISTORY DETAIL MODAL -->
+<div class="modal-overlay" id="detail-modal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeDetailModal()">×</button>
+    <h3 id="detail-title"></h3>
+    <div id="detail-content"></div>
+    <div style="display: flex; gap: 8px; margin-top: 14px;">
+      <button class="btn btn-ghost" onclick="closeDetailModal()" style="flex:1;">Close</button>
+      <button class="btn btn-danger" onclick="deleteLecture()" style="flex:1;">Delete Lecture</button>
+    </div>
+  </div>
+</div>
+
+<!-- STUDENT DETAIL MODAL -->
+<div class="modal-overlay" id="student-modal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeStudentModal()">×</button>
+    <h3 id="student-modal-title"></h3>
+    <div id="student-modal-content"></div>
+    <div style="display: flex; gap: 8px; margin-top: 14px;">
+      <button class="btn btn-ghost" onclick="closeStudentModal()" style="flex:1;">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADD TIMETABLE SLOT MODAL -->
+<div class="modal-overlay" id="slot-modal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeSlotModal()">×</button>
+    <h3 id="slot-modal-title">Add Lecture Slot</h3>
+    <div class="field">
+      <label>Day of Week</label>
+      <select id="slot-day">
+        <option value="1">Monday</option>
+        <option value="2">Tuesday</option>
+        <option value="3">Wednesday</option>
+        <option value="4">Thursday</option>
+        <option value="5">Friday</option>
+        <option value="6">Saturday</option>
+        <option value="0">Sunday</option>
+      </select>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label>Start Time</label>
+        <input type="time" id="slot-start">
+      </div>
+      <div class="field">
+        <label>End Time</label>
+        <input type="time" id="slot-end">
+      </div>
+    </div>
+    <div class="field">
+      <label>Subject</label>
+      <select id="slot-subject"></select>
+    </div>
+    <div class="field">
+      <label>Division</label>
+      <select id="slot-div">
+        <option value="A">Division A</option>
+        <option value="B">Division B</option>
+      </select>
+    </div>
+    <div style="display: flex; gap: 8px; margin-top: 12px;">
+      <button class="btn btn-ghost" onclick="closeSlotModal()" style="flex:1;">Cancel</button>
+      <button class="btn btn-primary" onclick="saveSlot()" style="flex:1;">Save Slot</button>
+    </div>
+  </div>
+</div>
+
+<!-- BULK IMPORT MODAL -->
+<div class="modal-overlay" id="bulk-modal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeBulkModal()">×</button>
+    <h3>Bulk Import Students</h3>
+    <p style="font-size:12px;color:var(--ink-muted);margin:0 0 10px;">
+      Paste student names — one per line. Numbers/roll prefixes will be auto-stripped.
+      Will be added to Division <strong id="bulk-target-div">A</strong>.
+    </p>
+    <div class="field">
+      <label>Mode</label>
+      <select id="bulk-mode">
+        <option value="append">Append to existing list</option>
+        <option value="replace">Replace entire list</option>
+      </select>
+    </div>
+    <textarea id="bulk-text" rows="10" placeholder="1 Arpita Shankar Pagare&#10;2 Choudhary Gufran Anwar&#10;3 Malik Ayesha Bano Lallan&#10;..."></textarea>
+    <div style="font-size:11px;color:var(--ink-muted);margin-top:6px;" id="bulk-preview"></div>
+    <div style="display: flex; gap: 8px; margin-top: 12px;">
+      <button class="btn btn-ghost" onclick="closeBulkModal()" style="flex:1;">Cancel</button>
+      <button class="btn btn-primary" onclick="confirmBulkImport()" style="flex:1;">Import</button>
+    </div>
+  </div>
+</div>
+
+<!-- PIN SETUP MODAL -->
+<div class="modal-overlay" id="pinsetup-modal">
+  <div class="modal">
+    <button class="modal-close" onclick="closePinSetupModal()">×</button>
+    <h3 id="pinsetup-title">Set PIN</h3>
+    <p style="font-size:12px;color:var(--ink-muted);margin:0 0 10px;" id="pinsetup-msg">Enter a 4-digit PIN</p>
+    <div class="field">
+      <input type="password" inputmode="numeric" maxlength="4" id="pinsetup-input" style="text-align:center;font-size:24px;letter-spacing:10px;" oninput="onPinSetupInput()">
+    </div>
+    <div style="display: flex; gap: 8px;">
+      <button class="btn btn-ghost" onclick="closePinSetupModal()" style="flex:1;">Cancel</button>
+      <button class="btn btn-primary" onclick="confirmPinSetup()" style="flex:1;" id="pinsetup-confirm">Continue</button>
+    </div>
+  </div>
+</div>
+
+<!-- BOTTOM NAV -->
+<nav class="bottom-nav">
+  <button class="nav-item active" data-tab="home" onclick="navTo('home')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l9-9 9 9M5 10v10h14V10"/></svg>
+    Home
+  </button>
+  <button class="nav-item" data-tab="mark" onclick="navTo('mark')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+    Mark
+  </button>
+  <button class="nav-item" data-tab="history" onclick="navTo('history')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+    History
+  </button>
+  <button class="nav-item" data-tab="reports" onclick="navTo('reports')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18M7 14l4-4 4 4 6-6"/></svg>
+    Reports
+  </button>
+  <button class="nav-item" data-tab="settings" onclick="navTo('settings')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+    More
+  </button>
+</nav>
+
+<script>
+/* ===================== DATA LAYER ===================== */
+const STORAGE_KEY = 'classRegister_v2';
+const LEGACY_KEY = 'classRegister_v1';
+const PIN_KEY = 'classRegister_pin';
+const AUTOBACKUP_KEY = 'classRegister_autobackup';
+const LAST_BACKUP_KEY = 'classRegister_lastBackup';
+
+const INITIAL_DATA = {
+  students: {
+    A: [
+      "Arpita Shankar Pagare","Choudhary Gufran Anwar","Malik Ayesha Bano Lallan","Mallebhari Alfiya Jamil Ahmad",
+      "Moon Pratik Padmakar","More Vighnaharta Ganesh","Nadaf Alfiya Daval","Panchal Atharv Pandurang",
+      "Patil Nutan Sadashiv","Pawar Vaishnavi Vijay","Prajapati Surendrakumar","Pramod Sesaram Choudhary",
+      "Rasale Vaishnavi Someshwar","Salunke Janhavi Pramod","Aade Rahul Suresh","Ansari Muskan Jannatali",
+      "Bais Akshay Rajesh","Bandal Sarika Kailas","Bansode Amruta Anil","Bhartiya Khushi Santlal",
+      "Bhosale Sakshi Bharat","Bhosale Sanskruti Babasaheb","Choudhary Bhavesh Punaram","Choudhary Kailash",
+      "Choudhary Poornima Mangilal","Choudhary Rahulkumar","Desale Rupak Hemant","Dumbre Jayanti Mahesh",
+      "Gaikwad Priti Ramesh","Gaikwad Mansi Chandrahar","Gange Mohit Suresh","Garje Deepak Subhash",
+      "Ghare Pallavi Navnath","Gorge Pallavi Tukaram","Gupta Raj Ramji","Gurav Ankita Vikas",
+      "Hussain Atiqah Shariq","Ingale Pradnya Vinayak","Jagtap Divya Dhanaji","Jamkhedkar Kartik Dinesh",
+      "Jangale Vitthal Santosh","Jathore Vijaykumar Jamnaji","Kale Anurag Ravindra","Kamble Swapnil Uttamrao",
+      "Kapurkar Shrushti Pandurang","Kargal Rutuja Chhagan","Kaul Palash Vimal","Kawade Eshan Sanjay",
+      "Khan MohammadZumer","Khan Nausheen Diler","Khan Muniza Fatima Mubin","Khatake Nikhil Shivaji",
+      "Kolate Rohan Ravindra","Malusare Kshitija Sandip","More Pranali Gangadhar","Muke Pranav Pandit",
+      "Mulla Pakiza","Munde Madhavi Sugriv","Nikam Atharva Deepak","Panchal Sakshi Balaji"
+    ],
+    B: [
+      "Rajbhar Rima Ramadarash","Rathod Nikita Sukhdev","Sabale Vaishnavi Machhindra","Salunkhe Sanika Santosh",
+      "Salve Drishti Laxman","Sarode Milind Uddhav Uddhav","Sathe Aditya Parmeshwar","Satpute Akshay Sunil",
+      "Shaikh Bushra Anwar","Shaikh Gulfam Gulzar","Shaikh Mehreen Mansoor","Shaikh Tasneem Jamilahmed",
+      "Shinde Chaitali Sanjay","Sonavane Komal Krushna","Swami Revati Ravishankar","Vishvakarma Priti Dinesh",
+      "Vishwakarma Raunak Sanjay","Waghmare Apekshit","Walke Prabuddha Bhivaji","Yadav Sakshi Suresh",
+      "Bankhele Srushti Sandip","ShikalgarGausiya Jakir","Thombare Nikita Nana","Shikalgar Gulnaj Jakir",
+      "Gade Sayalee Bhagwant","Jagtap Shravasti Gorakhnath","Dalave Pawanraj Sitaram","Chidrawar Aniket Anil",
+      "Chimkar Yash Babu","Darbastwar Abhay Suryakant","Sarekar Siddhi Ramdas","Patange Shruti Prakash",
+      "Nevarekar Aniket Suresh","Ansari Saniya Irfan","Gutte Piyush Rajkumar","Bhakti Ganesh Chavan",
+      "Gangurde Durgesh Anil","Paithane Bhumika Ashok","Chavan Pranavi Bhagvan","Dond Pragati Sarjerao",
+      "Bendure Sanskruti Balasaheb","Ingole MrugdhaliShripatrao","RitheInshwari Namdev","Mahale Trupti Bhikanrao",
+      "Singh Anurag Sanjay","Chaudhari Roshani Prakash","Talegaonkar Samruddhi Amit","Kushwaha Ayush Suryakumar",
+      "Dobe Gopal Anil","KokarePrashis Prakash","Jagtap Manasi Appasaheb"
+    ]
+  },
+  subjects: ["General Lecture"],
+  lectures: [],
+  threshold: 75,
+  timetable: [], // [{id, day, start, end, subject, division}]
+  professorName: "",
+  collegeName: ""
+};
+
+const ROLL_OFFSET = { A: 1, B: 61 };
+
+function loadData() {
+  try {
+    let raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) {
+      // Try migrating from v1
+      const legacy = localStorage.getItem(LEGACY_KEY);
+      if (legacy) raw = legacy;
+    }
+    if (!raw) return JSON.parse(JSON.stringify(INITIAL_DATA));
+    const parsed = JSON.parse(raw);
+    if (!parsed.students) parsed.students = INITIAL_DATA.students;
+    if (!parsed.subjects) parsed.subjects = INITIAL_DATA.subjects;
+    if (!parsed.lectures) parsed.lectures = [];
+    if (parsed.threshold == null) parsed.threshold = 75;
+    if (!parsed.timetable) parsed.timetable = [];
+    return parsed;
+  } catch (e) {
+    return JSON.parse(JSON.stringify(INITIAL_DATA));
+  }
+}
+
+function saveData() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  // Trigger auto-backup if enabled
+  triggerAutoBackup();
+}
+
+let data = loadData();
+
+/* ===================== UI HELPERS ===================== */
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+function todayISO() {
+  const d = new Date();
+  const off = d.getTimezoneOffset();
+  const local = new Date(d.getTime() - off * 60000);
+  return local.toISOString().split('T')[0];
+}
+
+function formatDate(iso) {
+  const d = new Date(iso + 'T00:00:00');
+  return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function formatDateLong() {
+  return new Date().toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
+}
+
+function getRoll(div, idx) { return ROLL_OFFSET[div] + idx; }
+
+function escapeHtml(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function escapeAttr(s) { return escapeHtml(s); }
+
+/* ===================== NAVIGATION ===================== */
+const TABS = ['home', 'mark', 'history', 'reports', 'compare', 'search', 'timetable', 'settings'];
+
+function navTo(tab) {
+  // "More" maps to settings for the 5th bottom nav button
+  const visualTab = ['compare', 'search', 'timetable'].includes(tab) ? null : tab;
+
+  TABS.forEach(t => {
+    const el = document.getElementById('tab-' + t);
+    if (el) el.classList.add('hidden');
+  });
+  const target = document.getElementById('tab-' + tab);
+  if (target) target.classList.remove('hidden');
+
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  if (visualTab) {
+    const navBtn = document.querySelector(`.nav-item[data-tab="${visualTab}"]`);
+    if (navBtn) navBtn.classList.add('active');
+  }
+  window.scrollTo(0, 0);
+
+  if (tab === 'home') renderHome();
+  if (tab === 'mark') renderMarkForm();
+  if (tab === 'history') renderHistory();
+  if (tab === 'reports') renderReport();
+  if (tab === 'compare') renderCompare();
+  if (tab === 'search') renderSearch();
+  if (tab === 'timetable') renderTimetable();
+  if (tab === 'settings') renderSettings();
+}
+
+function goToMark(prefill) {
+  navTo('mark');
+  if (prefill) {
+    setTimeout(() => {
+      document.getElementById('mark-div').value = prefill.division;
+      document.getElementById('mark-subject').value = prefill.subject;
+      if (prefill.time) document.getElementById('mark-time').value = prefill.time;
+      renderMarkList();
+    }, 50);
+  }
+}
+
+/* ===================== HOME ===================== */
+function renderHome() {
+  document.getElementById('today-label').textContent = formatDateLong();
+
+  const totalStudents = data.students.A.length + data.students.B.length;
+  document.getElementById('stat-students').textContent = totalStudents;
+  document.getElementById('stat-lectures').textContent = data.lectures.length;
+
+  const allStats = computeAllStudentStats();
+  if (allStats.length === 0) {
+    document.getElementById('stat-avg').textContent = '—';
+    document.getElementById('stat-defaulters').textContent = '0';
+  } else {
+    const avg = allStats.reduce((s, x) => s + x.pct, 0) / allStats.length;
+    document.getElementById('stat-avg').textContent = Math.round(avg);
+    const defaulters = allStats.filter(x => x.pct < data.threshold && x.total > 0).length;
+    document.getElementById('stat-defaulters').textContent = defaulters;
+  }
+
+  renderTodaySchedule();
+  renderBackupBanner();
+
+  const recent = [...data.lectures].sort((a, b) => b.date.localeCompare(a.date) || b.createdAt - a.createdAt).slice(0, 4);
+  const container = document.getElementById('recent-list');
+  if (recent.length === 0) {
+    container.innerHTML = `<div class="empty"><div class="serif">No lectures yet</div><div>Tap "Mark Attendance" to begin.</div></div>`;
+  } else {
+    container.innerHTML = recent.map(l => historyItemHTML(l)).join('');
+  }
+}
+
+function renderTodaySchedule() {
+  const today = new Date().getDay(); // 0 = Sunday
+  const slots = data.timetable.filter(s => s.day === today).sort((a,b) => a.start.localeCompare(b.start));
+  const todayDate = todayISO();
+  const container = document.getElementById('today-schedule');
+
+  if (slots.length === 0) {
+    container.innerHTML = `<p style="font-size:13px;color:var(--ink-muted);margin:0;">No timetable set for today. <a href="#" onclick="navTo('timetable');return false;" style="color:var(--accent);">Set up timetable →</a></p>`;
+    return;
+  }
+
+  container.innerHTML = slots.map(slot => {
+    // Has attendance been marked for this slot today?
+    const marked = data.lectures.find(l =>
+      l.date === todayDate && l.division === slot.division && l.subject === slot.subject
+    );
+    return `
+      <div class="today-slot ${marked ? 'done' : ''}" onclick='${marked ? `openLectureDetail("${marked.id}")` : `goToMark(${JSON.stringify({division: slot.division, subject: slot.subject, time: slot.start + " - " + slot.end})})`}'>
+        <div class="today-time">${slot.start}</div>
+        <div class="today-info">
+          <div class="today-info-subj">${escapeHtml(slot.subject)} <span class="chip">Div ${slot.division}</span></div>
+          <div class="today-info-meta">${slot.start} – ${slot.end}${marked ? ' · ✓ Marked' : ''}</div>
+        </div>
+        <div>${marked ? '✓' : '→'}</div>
+      </div>`;
+  }).join('');
+}
+
+function historyItemHTML(l) {
+  const presentCount = Object.values(l.attendance).filter(v => v === 'P').length;
+  const total = Object.keys(l.attendance).length;
+  const pct = total === 0 ? 0 : Math.round(presentCount / total * 100);
+  return `
+    <div class="history-item" onclick="openLectureDetail('${l.id}')">
+      <div class="history-meta">
+        <div class="history-title">${escapeHtml(l.subject)} <span class="chip">Div ${l.division}</span></div>
+        <div class="history-sub">${formatDate(l.date)}${l.time ? ' · ' + escapeHtml(l.time) : ''}</div>
+      </div>
+      <div class="history-stat">${presentCount}/${total} <div class="small">${pct}% present</div></div>
+    </div>`;
+}
+
+/* ===================== BACKUP REMINDER BANNER ===================== */
+function renderBackupBanner() {
+  const area = document.getElementById('banner-area');
+  area.innerHTML = '';
+
+  const last = localStorage.getItem(LAST_BACKUP_KEY);
+  const auto = getAutoBackupHandle();
+  const lectureCount = data.lectures.length;
+
+  if (lectureCount === 0) return;
+
+  if (auto) {
+    // Auto-backup is set; no banner needed unless errors
+    return;
+  }
+
+  // Calculate lectures since last backup
+  let lecturesSince = lectureCount;
+  if (last) {
+    const lastBackupTime = parseInt(last, 10);
+    lecturesSince = data.lectures.filter(l => l.createdAt > lastBackupTime).length;
+  }
+
+  if (lecturesSince >= 5 || !last) {
+    area.innerHTML = `
+      <div class="banner warn">
+        <div class="banner-msg">
+          <strong>Backup recommended.</strong> ${lecturesSince} new ${lecturesSince === 1 ? 'lecture' : 'lectures'} since last backup.
+        </div>
+        <button onclick="exportBackup()">Backup Now</button>
+      </div>`;
+  }
+}
+
+/* ===================== MARK ATTENDANCE ===================== */
+let markState = {};
+let markNotes = {};
+let currentNoteIdx = null;
+let markMode = 'tap';
+
+function renderMarkForm() {
+  document.getElementById('mark-date').value = todayISO();
+  const subjSel = document.getElementById('mark-subject');
+  subjSel.innerHTML = data.subjects.map(s => `<option value="${escapeAttr(s)}">${escapeHtml(s)}</option>`).join('');
+  document.getElementById('mark-time').value = '';
+  document.getElementById('mark-search').value = '';
+  document.getElementById('roll-absent').value = '';
+
+  markState = {};
+  markNotes = {};
+  document.getElementById('mark-div').onchange = onDivisionChange;
+  setMarkMode('tap');
+  renderMarkList();
+}
+
+function onDivisionChange() {
+  markState = {};
+  markNotes = {};
+  renderMarkList();
+  updateRollPreview();
+}
+
+function setMarkMode(mode) {
+  markMode = mode;
+  document.getElementById('mode-tap').classList.toggle('active', mode === 'tap');
+  document.getElementById('mode-roll').classList.toggle('active', mode === 'roll');
+  document.getElementById('tap-mode-section').classList.toggle('hidden', mode !== 'tap');
+  document.getElementById('roll-mode-section').classList.toggle('hidden', mode !== 'roll');
+  if (mode === 'roll') updateRollPreview();
+}
+
+function renderMarkList() {
+  const div = document.getElementById('mark-div').value;
+  const students = data.students[div];
+  const search = (document.getElementById('mark-search')?.value || '').trim().toLowerCase();
+  const list = document.getElementById('mark-list');
+
+  const html = students.map((name, idx) => {
+    if (search && !name.toLowerCase().includes(search) && !String(getRoll(div, idx)).includes(search)) return '';
+    const status = markState[idx] || '';
+    const hasNote = markNotes[idx];
+    return `
+      <div class="student-row ${status === 'P' ? 'present' : status === 'A' ? 'absent' : ''}" id="row-${idx}">
+        <div class="student-roll">${getRoll(div, idx)}</div>
+        <div class="student-name">${escapeHtml(name)}</div>
+        <button class="note-btn ${hasNote ? 'has-note' : ''}" onclick="openNoteModal(${idx})" title="Add note">✎</button>
+        <div class="mark-btns">
+          <button class="mark-btn p-btn ${status === 'P' ? 'active' : ''}" onclick="markStudent(${idx}, 'P')">P</button>
+          <button class="mark-btn a-btn ${status === 'A' ? 'active' : ''}" onclick="markStudent(${idx}, 'A')">A</button>
+        </div>
+      </div>`;
+  }).join('');
+
+  list.innerHTML = html || `<div class="empty">No students match "${escapeHtml(search)}"</div>`;
+  updateMarkSummary();
+}
+
+function filterMarkList() { renderMarkList(); }
+
+function updateMarkSummary() {
+  const p = Object.values(markState).filter(v => v === 'P').length;
+  const a = Object.values(markState).filter(v => v === 'A').length;
+  const div = document.getElementById('mark-div').value;
+  const total = data.students[div].length;
+  const unmarked = total - p - a;
+  document.getElementById('mark-summary').textContent = `${p} present · ${a} absent · ${unmarked} unmarked (counts as absent on save)`;
+}
+
+function markStudent(idx, status) {
+  if (markState[idx] === status) {
+    delete markState[idx];
+  } else {
+    markState[idx] = status;
+  }
+  const row = document.getElementById('row-' + idx);
+  const newStatus = markState[idx] || '';
+  row.classList.remove('present', 'absent');
+  if (newStatus === 'P') row.classList.add('present');
+  if (newStatus === 'A') row.classList.add('absent');
+  row.querySelector('.p-btn').classList.toggle('active', newStatus === 'P');
+  row.querySelector('.a-btn').classList.toggle('active', newStatus === 'A');
+  updateMarkSummary();
+}
+
+function bulkMark(status) {
+  const div = document.getElementById('mark-div').value;
+  const students = data.students[div];
+  if (status === '') {
+    markState = {};
+  } else {
+    students.forEach((_, idx) => markState[idx] = status);
+  }
+  renderMarkList();
+}
+
+/* ROLL NUMBER MODE */
+function parseAbsentRolls(text, div) {
+  const offset = ROLL_OFFSET[div];
+  const max = offset + data.students[div].length - 1;
+  const absents = new Set();
+  const invalid = [];
+
+  // Replace separators with spaces
+  const tokens = text.replace(/[,;\n]/g, ' ').split(/\s+/).filter(t => t.length);
+
+  tokens.forEach(tok => {
+    if (tok.includes('-')) {
+      const [a, b] = tok.split('-').map(s => parseInt(s.trim(), 10));
+      if (!isNaN(a) && !isNaN(b)) {
+        const lo = Math.min(a, b), hi = Math.max(a, b);
+        for (let i = lo; i <= hi; i++) {
+          if (i >= offset && i <= max) absents.add(i);
+          else invalid.push(i);
+        }
+      } else {
+        invalid.push(tok);
+      }
+    } else {
+      const n = parseInt(tok, 10);
+      if (!isNaN(n)) {
+        if (n >= offset && n <= max) absents.add(n);
+        else invalid.push(n);
+      } else {
+        invalid.push(tok);
+      }
+    }
+  });
+
+  return { absents: [...absents].sort((a,b) => a-b), invalid };
+}
+
+function updateRollPreview() {
+  const div = document.getElementById('mark-div').value;
+  const text = document.getElementById('roll-absent').value;
+  const { absents, invalid } = parseAbsentRolls(text, div);
+  const total = data.students[div].length;
+  const offset = ROLL_OFFSET[div];
+
+  const preview = document.getElementById('roll-preview');
+  let html = '';
+  if (absents.length === 0 && invalid.length === 0) {
+    html = `<span style="font-size:12px;color:var(--ink-muted);">No absent rolls — everyone marked present</span>`;
+  } else {
+    html += `<span class="chip green">${total - absents.length} Present</span> <span class="chip red">${absents.length} Absent</span> `;
+    absents.slice(0, 30).forEach(r => {
+      const idx = r - offset;
+      const name = data.students[div][idx] || '';
+      html += `<span class="chip red" title="${escapeAttr(name)}">${r}</span>`;
+    });
+    if (absents.length > 30) html += `<span class="chip">+${absents.length - 30} more</span>`;
+  }
+  if (invalid.length > 0) {
+    html += `<br><span class="chip warn">⚠ Invalid: ${invalid.slice(0,10).join(', ')}${invalid.length > 10 ? '...' : ''}</span>`;
+  }
+  preview.innerHTML = html;
+}
+
+function openNoteModal(idx) {
+  const div = document.getElementById('mark-div').value;
+  const name = data.students[div][idx];
+  currentNoteIdx = idx;
+  document.getElementById('note-student-name').textContent = name;
+  document.getElementById('note-text').value = markNotes[idx] || '';
+  document.getElementById('note-modal').classList.add('show');
+}
+
+function closeNoteModal() {
+  document.getElementById('note-modal').classList.remove('show');
+  currentNoteIdx = null;
+}
+
+function saveNote() {
+  const text = document.getElementById('note-text').value.trim();
+  if (text) markNotes[currentNoteIdx] = text;
+  else delete markNotes[currentNoteIdx];
+  closeNoteModal();
+  renderMarkList();
+}
+
+function saveAttendance() {
+  const date = document.getElementById('mark-date').value;
+  const division = document.getElementById('mark-div').value;
+  const subject = document.getElementById('mark-subject').value;
+  const time = document.getElementById('mark-time').value.trim();
+
+  if (!date) { toast('Please pick a date'); return; }
+  if (!subject) { toast('Please pick a subject'); return; }
+
+  const students = data.students[division];
+  const attendance = {};
+  const notes = {};
+
+  if (markMode === 'roll') {
+    const text = document.getElementById('roll-absent').value;
+    const { absents, invalid } = parseAbsentRolls(text, division);
+    if (invalid.length > 0) {
+      if (!confirm(`Some roll numbers are invalid: ${invalid.slice(0,10).join(', ')}. Save anyway (these will be ignored)?`)) return;
+    }
+    const offset = ROLL_OFFSET[division];
+    const absentSet = new Set(absents.map(r => r - offset));
+    students.forEach((name, idx) => {
+      attendance[name] = absentSet.has(idx) ? 'A' : 'P';
+    });
+  } else {
+    students.forEach((name, idx) => {
+      attendance[name] = markState[idx] || 'A';
+      if (markNotes[idx]) notes[name] = markNotes[idx];
+    });
+  }
+
+  const existing = data.lectures.find(l =>
+    l.date === date && l.division === division && l.subject === subject && (l.time || '') === time
+  );
+  if (existing) {
+    if (!confirm('A lecture with the same date, division, subject and time already exists. Overwrite it?')) return;
+    existing.attendance = attendance;
+    existing.notes = notes;
+    existing.updatedAt = Date.now();
+  } else {
+    data.lectures.push({
+      id: 'L' + Date.now() + Math.random().toString(36).slice(2, 6),
+      date, division, subject, time,
+      attendance, notes,
+      createdAt: Date.now()
+    });
+  }
+  saveData();
+  toast('Attendance saved ✓');
+  navTo('home');
+}
+
+/* ===================== HISTORY ===================== */
+function renderHistory() {
+  const subjSel = document.getElementById('hist-subj');
+  const currentSubj = subjSel.value;
+  subjSel.innerHTML = '<option value="">All</option>' +
+    data.subjects.map(s => `<option value="${escapeAttr(s)}">${escapeHtml(s)}</option>`).join('');
+  subjSel.value = currentSubj;
+
+  const filterDiv = document.getElementById('hist-div').value;
+  const filterSubj = document.getElementById('hist-subj').value;
+
+  let list = [...data.lectures];
+  if (filterDiv) list = list.filter(l => l.division === filterDiv);
+  if (filterSubj) list = list.filter(l => l.subject === filterSubj);
+  list.sort((a, b) => b.date.localeCompare(a.date) || b.createdAt - a.createdAt);
+
+  const container = document.getElementById('history-list');
+  if (list.length === 0) {
+    container.innerHTML = `<div class="empty"><div class="serif">No lectures match</div></div>`;
+  } else {
+    container.innerHTML = list.map(historyItemHTML).join('');
+  }
+}
+
+let currentDetailId = null;
+function openLectureDetail(id) {
+  const l = data.lectures.find(x => x.id === id);
+  if (!l) return;
+  currentDetailId = id;
+
+  const presentCount = Object.values(l.attendance).filter(v => v === 'P').length;
+  const total = Object.keys(l.attendance).length;
+  const absent = total - presentCount;
+
+  document.getElementById('detail-title').innerHTML =
+    `${escapeHtml(l.subject)} · Div ${l.division}<br><span style="font-size:13px;color:var(--ink-muted);font-family:Inter;font-weight:400;">${formatDate(l.date)}${l.time ? ' · ' + escapeHtml(l.time) : ''}</span>`;
+
+  const div = l.division;
+  const studentList = data.students[div];
+  const rows = studentList.map((name, idx) => {
+    const status = l.attendance[name] || 'A';
+    const note = l.notes && l.notes[name];
+    return `
+      <div class="student-row ${status === 'P' ? 'present' : 'absent'}">
+        <div class="student-roll">${getRoll(div, idx)}</div>
+        <div class="student-name">${escapeHtml(name)}${note ? `<div style="font-size:11px;color:var(--ink-muted);margin-top:2px;">✎ ${escapeHtml(note)}</div>` : ''}</div>
+        <span class="chip ${status === 'P' ? 'green' : 'red'}">${status === 'P' ? 'P' : 'A'}</span>
+      </div>`;
+  }).join('');
+
+  document.getElementById('detail-content').innerHTML = `
+    <div style="display:flex;gap:8px;margin-bottom:14px;">
+      <span class="chip green">${presentCount} Present</span>
+      <span class="chip red">${absent} Absent</span>
+    </div>
+    <div class="student-list">${rows}</div>
+  `;
+  document.getElementById('detail-modal').classList.add('show');
+}
+
+function closeDetailModal() {
+  document.getElementById('detail-modal').classList.remove('show');
+  currentDetailId = null;
+}
+
+function deleteLecture() {
+  if (!currentDetailId) return;
+  if (!confirm('Delete this lecture? This cannot be undone.')) return;
+  data.lectures = data.lectures.filter(l => l.id !== currentDetailId);
+  saveData();
+  closeDetailModal();
+  renderHistory();
+  toast('Lecture deleted');
+}
+
+/* ===================== REPORTS ===================== */
+function computeStudentStats(div, subject, fromDate, toDate) {
+  const students = data.students[div];
+  let lectures = data.lectures.filter(l => l.division === div);
+  if (subject) lectures = lectures.filter(l => l.subject === subject);
+  if (fromDate) lectures = lectures.filter(l => l.date >= fromDate);
+  if (toDate) lectures = lectures.filter(l => l.date <= toDate);
+
+  return students.map((name, idx) => {
+    let present = 0, total = 0;
+    lectures.forEach(l => {
+      if (l.attendance.hasOwnProperty(name)) {
+        total++;
+        if (l.attendance[name] === 'P') present++;
+      }
+    });
+    return {
+      roll: getRoll(div, idx),
+      name,
+      present,
+      total,
+      pct: total === 0 ? 0 : Math.round(present / total * 100)
+    };
+  });
+}
+
+function computeAllStudentStats() {
+  return [...computeStudentStats('A', ''), ...computeStudentStats('B', '')].filter(s => s.total > 0);
+}
+
+function renderReport() {
+  const subjSel = document.getElementById('rep-subj');
+  const currentSubj = subjSel.value;
+  subjSel.innerHTML = '<option value="">All Subjects</option>' +
+    data.subjects.map(s => `<option value="${escapeAttr(s)}">${escapeHtml(s)}</option>`).join('');
+  subjSel.value = currentSubj;
+
+  document.getElementById('rep-threshold').value = data.threshold;
+
+  const div = document.getElementById('rep-div').value;
+  const subject = document.getElementById('rep-subj').value;
+  const fromDate = document.getElementById('rep-from').value;
+  const toDate = document.getElementById('rep-to').value;
+
+  const stats = computeStudentStats(div, subject, fromDate, toDate);
+  let lectures = data.lectures.filter(l => l.division === div);
+  if (subject) lectures = lectures.filter(l => l.subject === subject);
+  if (fromDate) lectures = lectures.filter(l => l.date >= fromDate);
+  if (toDate) lectures = lectures.filter(l => l.date <= toDate);
+  const lecturesCount = lectures.length;
+
+  const defaulters = stats.filter(s => s.total > 0 && s.pct < data.threshold);
+  const withData = stats.filter(s => s.total > 0);
+  const avg = withData.length ? withData.reduce((sum, s) => sum + s.pct, 0) / withData.length : 0;
+
+  document.getElementById('report-summary').innerHTML = `
+    <div class="stats-grid">
+      <div class="stat"><div class="stat-label">Lectures</div><div class="stat-value">${lecturesCount}</div></div>
+      <div class="stat"><div class="stat-label">Avg Attendance</div><div class="stat-value">${lecturesCount === 0 ? '—' : Math.round(avg)}<span class="unit">%</span></div></div>
+      <div class="stat"><div class="stat-label">Defaulters (&lt;${data.threshold}%)</div><div class="stat-value">${defaulters.length}</div></div>
+      <div class="stat"><div class="stat-label">Total Students</div><div class="stat-value">${stats.length}</div></div>
+    </div>
+  `;
+
+  const sorted = [...stats].sort((a, b) => a.roll - b.roll);
+  const container = document.getElementById('report-list');
+  if (lecturesCount === 0) {
+    container.innerHTML = `<div class="empty"><div class="serif">No lectures recorded</div><div>For the selected filters.</div></div>`;
+    return;
+  }
+  container.innerHTML = sorted.map(s => {
+    const isDef = s.total > 0 && s.pct < data.threshold;
+    const pctClass = s.total === 0 ? '' : (isDef ? 'bad' : 'good');
+    return `
+      <div class="report-row ${isDef ? 'defaulter' : ''}" onclick="openStudentDetail('${escapeAttr(s.name)}','${s.roll < ROLL_OFFSET.B ? 'A' : 'B'}')">
+        <div class="student-roll">${s.roll}</div>
+        <div class="student-name">${escapeHtml(s.name)}<div style="font-size:11px;color:var(--ink-muted);">${s.present}/${s.total} lectures</div></div>
+        <div class="report-pct ${pctClass}">${s.total === 0 ? '—' : s.pct + '%'}</div>
+      </div>`;
+  }).join('');
+}
+
+function saveThreshold() {
+  const val = parseInt(document.getElementById('rep-threshold').value, 10);
+  if (!isNaN(val) && val >= 0 && val <= 100) {
+    data.threshold = val;
+    saveData();
+  }
+}
+
+/* ===================== EXPORTS (CSV) ===================== */
+function downloadFile(filename, content, mime='text/csv') {
+  const blob = new Blob([content], { type: mime + ';charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function csvEscape(v) {
+  if (v == null) return '';
+  const s = String(v);
+  if (s.includes(',') || s.includes('"') || s.includes('\n')) return '"' + s.replace(/"/g, '""') + '"';
+  return s;
+}
+
+function exportCSV() {
+  const div = document.getElementById('rep-div').value;
+  const subject = document.getElementById('rep-subj').value;
+  const fromDate = document.getElementById('rep-from').value;
+  const toDate = document.getElementById('rep-to').value;
+  const stats = computeStudentStats(div, subject, fromDate, toDate);
+  const header = ['Roll No', 'Name', 'Present', 'Total Lectures', 'Percentage', 'Status'];
+  const rows = stats.map(s => [
+    s.roll, s.name, s.present, s.total,
+    s.total === 0 ? '' : s.pct + '%',
+    s.total === 0 ? 'No data' : (s.pct < data.threshold ? 'Defaulter' : 'OK')
+  ]);
+  const csv = [header, ...rows].map(r => r.map(csvEscape).join(',')).join('\n');
+  const subjLabel = subject ? '_' + subject.replace(/\s+/g, '-') : '_All';
+  downloadFile(`Attendance_Div${div}${subjLabel}_${todayISO()}.csv`, csv);
+  toast('CSV downloaded');
+}
+
+function exportDetailedCSV() {
+  const div = document.getElementById('rep-div').value;
+  const subject = document.getElementById('rep-subj').value;
+  const fromDate = document.getElementById('rep-from').value;
+  const toDate = document.getElementById('rep-to').value;
+  let lectures = data.lectures.filter(l => l.division === div);
+  if (subject) lectures = lectures.filter(l => l.subject === subject);
+  if (fromDate) lectures = lectures.filter(l => l.date >= fromDate);
+  if (toDate) lectures = lectures.filter(l => l.date <= toDate);
+  lectures.sort((a, b) => a.date.localeCompare(b.date) || a.createdAt - b.createdAt);
+
+  if (lectures.length === 0) { toast('No lectures to export'); return; }
+
+  const students = data.students[div];
+  const header = ['Roll No', 'Name', ...lectures.map(l => `${l.date} ${l.subject}${l.time ? ' ('+l.time+')' : ''}`), 'Present', 'Total', 'Percentage'];
+  const rows = students.map((name, idx) => {
+    let present = 0, total = 0;
+    const cells = lectures.map(l => {
+      const status = l.attendance[name];
+      if (status) { total++; if (status === 'P') present++; }
+      return status || '';
+    });
+    const pct = total === 0 ? '' : Math.round(present / total * 100) + '%';
+    return [getRoll(div, idx), name, ...cells, present, total, pct];
+  });
+  const csv = [header, ...rows].map(r => r.map(csvEscape).join(',')).join('\n');
+  const subjLabel = subject ? '_' + subject.replace(/\s+/g, '-') : '_All';
+  downloadFile(`Detailed_Div${div}${subjLabel}_${todayISO()}.csv`, csv);
+  toast('Detailed CSV downloaded');
+}
+
+/* ===================== EXPORTS (PDF via print) ===================== */
+function exportPDF() {
+  const div = document.getElementById('rep-div').value;
+  const subject = document.getElementById('rep-subj').value;
+  const fromDate = document.getElementById('rep-from').value;
+  const toDate = document.getElementById('rep-to').value;
+  const stats = computeStudentStats(div, subject, fromDate, toDate);
+  let lectures = data.lectures.filter(l => l.division === div);
+  if (subject) lectures = lectures.filter(l => l.subject === subject);
+  if (fromDate) lectures = lectures.filter(l => l.date >= fromDate);
+  if (toDate) lectures = lectures.filter(l => l.date <= toDate);
+
+  const periodLabel = (fromDate && toDate) ? `${formatDate(fromDate)} to ${formatDate(toDate)}`
+    : fromDate ? `From ${formatDate(fromDate)}`
+    : toDate ? `Up to ${formatDate(toDate)}`
+    : 'All Time';
+
+  generatePrintablePDF({
+    title: 'Attendance Report',
+    subtitle: `Division ${div} · ${subject || 'All Subjects'} · ${periodLabel}`,
+    lectures: lectures.length,
+    stats: stats,
+    threshold: data.threshold,
+    showAll: true
+  });
+}
+
+function exportDefaulterPDF() {
+  const div = document.getElementById('rep-div').value;
+  const subject = document.getElementById('rep-subj').value;
+  const fromDate = document.getElementById('rep-from').value;
+  const toDate = document.getElementById('rep-to').value;
+  const stats = computeStudentStats(div, subject, fromDate, toDate);
+  const defaulters = stats.filter(s => s.total > 0 && s.pct < data.threshold);
+
+  if (defaulters.length === 0) { toast('No defaulters found'); return; }
+
+  let lectures = data.lectures.filter(l => l.division === div);
+  if (subject) lectures = lectures.filter(l => l.subject === subject);
+  if (fromDate) lectures = lectures.filter(l => l.date >= fromDate);
+  if (toDate) lectures = lectures.filter(l => l.date <= toDate);
+
+  const periodLabel = (fromDate && toDate) ? `${formatDate(fromDate)} to ${formatDate(toDate)}`
+    : fromDate ? `From ${formatDate(fromDate)}`
+    : toDate ? `Up to ${formatDate(toDate)}`
+    : 'All Time';
+
+  generatePrintablePDF({
+    title: 'Defaulter List',
+    subtitle: `Division ${div} · ${subject || 'All Subjects'} · ${periodLabel} · Below ${data.threshold}%`,
+    lectures: lectures.length,
+    stats: defaulters,
+    threshold: data.threshold,
+    showAll: false
+  });
+}
+
+function generatePrintablePDF(opts) {
+  const w = window.open('', '_blank');
+  if (!w) {
+    toast('Please allow pop-ups for PDF export');
+    return;
+  }
+  const styles = `
+    <style>
+      body { font-family: Georgia, 'Times New Roman', serif; margin: 30px; color: #1a1a1a; font-size: 12px; }
+      h1 { font-size: 22px; margin: 0 0 4px; }
+      .subtitle { font-size: 13px; color: #555; margin-bottom: 4px; }
+      .meta { font-size: 11px; color: #777; margin-bottom: 20px; }
+      table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+      th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; border-bottom: 2px solid #1a1a1a; padding: 8px 4px; }
+      td { padding: 7px 4px; border-bottom: 1px solid #ddd; font-size: 12px; }
+      tr.defaulter td { background: #fbeeee; }
+      .pct-bad { color: #a23e3e; font-weight: bold; }
+      .pct-good { color: #2d6a4f; font-weight: bold; }
+      .summary { display: flex; gap: 20px; margin: 16px 0; padding: 12px; background: #f5f1ea; border-radius: 6px; }
+      .summary-item { flex: 1; }
+      .summary-label { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #777; }
+      .summary-value { font-size: 18px; font-weight: bold; }
+      .footer { margin-top: 30px; padding-top: 10px; border-top: 1px solid #ccc; font-size: 10px; color: #888; display: flex; justify-content: space-between; }
+      .sig { margin-top: 50px; display: flex; justify-content: space-between; }
+      .sig-line { width: 200px; border-top: 1px solid #1a1a1a; padding-top: 4px; font-size: 11px; text-align: center; }
+      @media print {
+        @page { margin: 15mm; }
+        body { margin: 0; }
+        .no-print { display: none; }
+      }
+      .print-bar { background: #1a1a1a; color: white; padding: 12px; text-align: center; margin: -30px -30px 20px; }
+      .print-bar button { background: white; color: #1a1a1a; border: none; padding: 8px 16px; border-radius: 4px; font-weight: bold; cursor: pointer; margin: 0 4px; }
+    </style>`;
+
+  const withData = opts.stats.filter(s => s.total > 0);
+  const avg = withData.length ? withData.reduce((sum, s) => sum + s.pct, 0) / withData.length : 0;
+  const defaulterCount = opts.stats.filter(s => s.total > 0 && s.pct < opts.threshold).length;
+
+  const rows = opts.stats.sort((a,b) => a.roll - b.roll).map(s => {
+    const isDef = s.total > 0 && s.pct < opts.threshold;
+    const pctClass = s.total === 0 ? '' : (isDef ? 'pct-bad' : 'pct-good');
+    return `
+      <tr class="${isDef ? 'defaulter' : ''}">
+        <td>${s.roll}</td>
+        <td>${escapeHtml(s.name)}</td>
+        <td style="text-align:center;">${s.present}</td>
+        <td style="text-align:center;">${s.total}</td>
+        <td style="text-align:right;" class="${pctClass}">${s.total === 0 ? '—' : s.pct + '%'}</td>
+        <td>${s.total === 0 ? '—' : (isDef ? 'Defaulter' : 'OK')}</td>
+      </tr>`;
+  }).join('');
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head><title>${opts.title}</title>${styles}</head>
+    <body>
+      <div class="print-bar no-print">
+        <button onclick="window.print()">🖨 Save as PDF / Print</button>
+        <button onclick="window.close()">✕ Close</button>
+      </div>
+      <h1>${opts.title}</h1>
+      <div class="subtitle">${opts.subtitle}</div>
+      <div class="meta">Generated on ${new Date().toLocaleString('en-IN')}</div>
+
+      <div class="summary">
+        <div class="summary-item"><div class="summary-label">Lectures</div><div class="summary-value">${opts.lectures}</div></div>
+        <div class="summary-item"><div class="summary-label">Students</div><div class="summary-value">${opts.stats.length}</div></div>
+        <div class="summary-item"><div class="summary-label">Avg Attendance</div><div class="summary-value">${withData.length ? Math.round(avg) + '%' : '—'}</div></div>
+        <div class="summary-item"><div class="summary-label">Defaulters</div><div class="summary-value">${defaulterCount}</div></div>
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th style="width:60px;">Roll No</th>
+            <th>Name</th>
+            <th style="width:70px; text-align:center;">Present</th>
+            <th style="width:70px; text-align:center;">Total</th>
+            <th style="width:80px; text-align:right;">%</th>
+            <th style="width:90px;">Status</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+
+      <div class="sig">
+        <div class="sig-line">Signature of Faculty</div>
+        <div class="sig-line">Signature of HOD</div>
+      </div>
+
+      <div class="footer">
+        <span>Class Register · Generated offline on device</span>
+        <span>Page 1</span>
+      </div>
+    </body>
+    </html>`;
+  w.document.write(html);
+  w.document.close();
+  toast('PDF preview opened — tap Print to save');
+}
+
+/* ===================== STUDENT DETAIL ===================== */
+function openStudentDetail(name, div) {
+  // Find this student's full attendance history
+  const lectures = data.lectures
+    .filter(l => l.division === div && l.attendance.hasOwnProperty(name))
+    .sort((a,b) => b.date.localeCompare(a.date) || b.createdAt - a.createdAt);
+
+  const idx = data.students[div].indexOf(name);
+  const roll = idx >= 0 ? getRoll(div, idx) : '?';
+
+  const present = lectures.filter(l => l.attendance[name] === 'P').length;
+  const total = lectures.length;
+  const pct = total === 0 ? 0 : Math.round(present / total * 100);
+
+  // Per-subject breakdown
+  const bySubj = {};
+  lectures.forEach(l => {
+    if (!bySubj[l.subject]) bySubj[l.subject] = { p: 0, t: 0 };
+    bySubj[l.subject].t++;
+    if (l.attendance[name] === 'P') bySubj[l.subject].p++;
+  });
+
+  document.getElementById('student-modal-title').innerHTML = `
+    ${escapeHtml(name)}<br>
+    <span style="font-size:13px;color:var(--ink-muted);font-family:Inter;font-weight:400;">Roll ${roll} · Division ${div}</span>
+  `;
+
+  const subjBreakdown = Object.entries(bySubj).map(([subj, v]) => {
+    const p = Math.round(v.p / v.t * 100);
+    return `
+      <div class="compare-row">
+        <div class="compare-label">${escapeHtml(subj)}</div>
+        <div class="compare-bar-track"><div class="compare-bar-fill ${p < data.threshold ? 'bad' : ''}" style="width:${p}%"></div></div>
+        <div class="compare-pct">${p}%</div>
+      </div>`;
+  }).join('');
+
+  const recentRows = lectures.slice(0, 15).map(l => `
+    <div class="report-row" style="cursor:default;">
+      <div style="flex:1;">
+        <div style="font-weight:600;font-size:13px;">${escapeHtml(l.subject)}</div>
+        <div style="font-size:11px;color:var(--ink-muted);">${formatDate(l.date)}${l.time ? ' · ' + escapeHtml(l.time) : ''}</div>
+      </div>
+      <span class="chip ${l.attendance[name] === 'P' ? 'green' : 'red'}">${l.attendance[name] === 'P' ? 'Present' : 'Absent'}</span>
+    </div>`).join('');
+
+  document.getElementById('student-modal-content').innerHTML = `
+    <div class="stats-grid" style="margin-bottom:14px;">
+      <div class="stat"><div class="stat-label">Overall</div><div class="stat-value ${pct < data.threshold ? '' : ''}">${total ? pct + '%' : '—'}</div></div>
+      <div class="stat"><div class="stat-label">Lectures</div><div class="stat-value">${present}/${total}</div></div>
+    </div>
+    <h3>By Subject</h3>
+    ${subjBreakdown || '<div class="empty">No data yet</div>'}
+    <div class="divider"></div>
+    <h3>Recent Lectures</h3>
+    ${recentRows || '<div class="empty">No data yet</div>'}
+  `;
+  document.getElementById('student-modal').classList.add('show');
+}
+
+function closeStudentModal() {
+  document.getElementById('student-modal').classList.remove('show');
+}
+
+/* ===================== COMPARE ===================== */
+let compareMode = 'div';
+
+function switchCompare(mode) {
+  compareMode = mode;
+  document.querySelectorAll('.tab[data-cmp]').forEach(t => t.classList.toggle('active', t.dataset.cmp === mode));
+  renderCompare();
+}
+
+function renderCompare() {
+  const c = document.getElementById('compare-content');
+  if (compareMode === 'div') {
+    const a = computeAvg('A');
+    const b = computeAvg('B');
+    c.innerHTML = `
+      <div class="compare-row">
+        <div class="compare-label">Division A</div>
+        <div class="compare-bar-track"><div class="compare-bar-fill ${a < data.threshold ? 'bad' : ''}" style="width:${a}%"></div></div>
+        <div class="compare-pct">${a}%</div>
+      </div>
+      <div class="compare-row">
+        <div class="compare-label">Division B</div>
+        <div class="compare-bar-track"><div class="compare-bar-fill ${b < data.threshold ? 'bad' : ''}" style="width:${b}%"></div></div>
+        <div class="compare-pct">${b}%</div>
+      </div>
+      <p style="font-size:12px;color:var(--ink-muted);margin-top:12px;">Across all subjects, all time.</p>
+    `;
+  } else if (compareMode === 'subj') {
+    const rows = data.subjects.map(subj => {
+      const a = computeAvgForSubject('A', subj);
+      const b = computeAvgForSubject('B', subj);
+      return `
+        <div style="margin-bottom:14px;">
+          <div style="font-weight:600;font-size:14px;margin-bottom:6px;">${escapeHtml(subj)}</div>
+          <div class="compare-row">
+            <div class="compare-label">Div A</div>
+            <div class="compare-bar-track"><div class="compare-bar-fill ${a < 0 ? '' : (a < data.threshold ? 'bad' : '')}" style="width:${Math.max(0,a)}%"></div></div>
+            <div class="compare-pct">${a < 0 ? '—' : a + '%'}</div>
+          </div>
+          <div class="compare-row">
+            <div class="compare-label">Div B</div>
+            <div class="compare-bar-track"><div class="compare-bar-fill ${b < 0 ? '' : (b < data.threshold ? 'bad' : '')}" style="width:${Math.max(0,b)}%"></div></div>
+            <div class="compare-pct">${b < 0 ? '—' : b + '%'}</div>
+          </div>
+        </div>`;
+    }).join('');
+    c.innerHTML = rows || '<div class="empty">No subjects yet</div>';
+  } else if (compareMode === 'month') {
+    const monthMap = {};
+    data.lectures.forEach(l => {
+      const month = l.date.slice(0, 7); // YYYY-MM
+      if (!monthMap[month]) monthMap[month] = { p: 0, t: 0 };
+      Object.values(l.attendance).forEach(v => {
+        monthMap[month].t++;
+        if (v === 'P') monthMap[month].p++;
+      });
+    });
+    const months = Object.keys(monthMap).sort().reverse().slice(0, 12);
+    if (months.length === 0) {
+      c.innerHTML = '<div class="empty">No data yet</div>';
+      return;
+    }
+    c.innerHTML = months.map(m => {
+      const v = monthMap[m];
+      const pct = Math.round(v.p / v.t * 100);
+      const [y, mo] = m.split('-');
+      const monthName = new Date(parseInt(y), parseInt(mo)-1).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' });
+      return `
+        <div class="compare-row">
+          <div class="compare-label">${monthName}</div>
+          <div class="compare-bar-track"><div class="compare-bar-fill ${pct < data.threshold ? 'bad' : ''}" style="width:${pct}%"></div></div>
+          <div class="compare-pct">${pct}%</div>
+        </div>`;
+    }).join('');
+  }
+}
+
+function computeAvg(div) {
+  const stats = computeStudentStats(div, '').filter(s => s.total > 0);
+  if (stats.length === 0) return 0;
+  return Math.round(stats.reduce((sum, s) => sum + s.pct, 0) / stats.length);
+}
+
+function computeAvgForSubject(div, subj) {
+  const stats = computeStudentStats(div, subj).filter(s => s.total > 0);
+  if (stats.length === 0) return -1;
+  return Math.round(stats.reduce((sum, s) => sum + s.pct, 0) / stats.length);
+}
+
+/* ===================== SEARCH ===================== */
+function renderSearch() {
+  const query = (document.getElementById('search-input')?.value || '').trim().toLowerCase();
+  const container = document.getElementById('search-results');
+
+  if (!query) {
+    container.innerHTML = '<div class="empty"><div class="serif">Start typing</div><div>Search by name across both divisions.</div></div>';
+    return;
+  }
+
+  const results = [];
+  ['A', 'B'].forEach(div => {
+    data.students[div].forEach((name, idx) => {
+      if (name.toLowerCase().includes(query) || String(getRoll(div, idx)).includes(query)) {
+        const stats = computeStudentStatsForOne(name, div);
+        results.push({ name, div, roll: getRoll(div, idx), ...stats });
+      }
+    });
+  });
+
+  if (results.length === 0) {
+    container.innerHTML = `<div class="empty">No students match "${escapeHtml(query)}"</div>`;
+    return;
+  }
+
+  container.innerHTML = results.map(r => {
+    const isDef = r.total > 0 && r.pct < data.threshold;
+    const pctClass = r.total === 0 ? '' : (isDef ? 'bad' : 'good');
+    return `
+      <div class="report-row ${isDef ? 'defaulter' : ''}" onclick="openStudentDetail('${escapeAttr(r.name)}','${r.div}')">
+        <div class="student-roll">${r.roll}</div>
+        <div class="student-name">${escapeHtml(r.name)}<div style="font-size:11px;color:var(--ink-muted);">Div ${r.div} · ${r.present}/${r.total} lectures</div></div>
+        <div class="report-pct ${pctClass}">${r.total === 0 ? '—' : r.pct + '%'}</div>
+      </div>`;
+  }).join('');
+}
+
+function computeStudentStatsForOne(name, div) {
+  let present = 0, total = 0;
+  data.lectures.forEach(l => {
+    if (l.division === div && l.attendance.hasOwnProperty(name)) {
+      total++;
+      if (l.attendance[name] === 'P') present++;
+    }
+  });
+  return { present, total, pct: total === 0 ? 0 : Math.round(present / total * 100) };
+}
+
+/* ===================== TIMETABLE ===================== */
+const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+function renderTimetable() {
+  const c = document.getElementById('timetable-content');
+  if (data.timetable.length === 0) {
+    c.innerHTML = `<div class="empty"><div class="serif">No timetable yet</div><div>Add your weekly lecture slots below.</div></div>`;
+    return;
+  }
+  // Group by day
+  const byDay = {};
+  data.timetable.forEach(s => {
+    if (!byDay[s.day]) byDay[s.day] = [];
+    byDay[s.day].push(s);
+  });
+  const dayOrder = [1, 2, 3, 4, 5, 6, 0];
+  let html = '';
+  dayOrder.forEach(d => {
+    const slots = (byDay[d] || []).sort((a,b) => a.start.localeCompare(b.start));
+    if (slots.length === 0) return;
+    html += `
+      <div class="day-row">
+        <div class="day-label">${DAY_NAMES[d]}</div>
+        <div class="day-slots">
+          ${slots.map(s => `
+            <div class="slot">
+              <div class="slot-info">
+                <div class="slot-info-time">${s.start} – ${s.end}</div>
+                <div class="slot-info-sub">${escapeHtml(s.subject)} · Div ${s.division}</div>
+              </div>
+              <div class="slot-actions">
+                <button class="btn-ghost" onclick="editSlot('${s.id}')">✎</button>
+                <button class="btn-danger" onclick="deleteSlot('${s.id}')">🗑</button>
+              </div>
+            </div>`).join('')}
+        </div>
+      </div>`;
+  });
+  c.innerHTML = html;
+}
+
+let editingSlotId = null;
+function openAddSlotModal() {
+  editingSlotId = null;
+  document.getElementById('slot-modal-title').textContent = 'Add Lecture Slot';
+  document.getElementById('slot-day').value = new Date().getDay();
+  document.getElementById('slot-start').value = '';
+  document.getElementById('slot-end').value = '';
+  // Populate subjects
+  const sel = document.getElementById('slot-subject');
+  sel.innerHTML = data.subjects.map(s => `<option value="${escapeAttr(s)}">${escapeHtml(s)}</option>`).join('');
+  document.getElementById('slot-div').value = 'A';
+  document.getElementById('slot-modal').classList.add('show');
+}
+
+function editSlot(id) {
+  const s = data.timetable.find(x => x.id === id);
+  if (!s) return;
+  editingSlotId = id;
+  document.getElementById('slot-modal-title').textContent = 'Edit Lecture Slot';
+  document.getElementById('slot-day').value = s.day;
+  document.getElementById('slot-start').value = s.start;
+  document.getElementById('slot-end').value = s.end;
+  const sel = document.getElementById('slot-subject');
+  sel.innerHTML = data.subjects.map(sub => `<option value="${escapeAttr(sub)}">${escapeHtml(sub)}</option>`).join('');
+  sel.value = s.subject;
+  document.getElementById('slot-div').value = s.division;
+  document.getElementById('slot-modal').classList.add('show');
+}
+
+function closeSlotModal() {
+  document.getElementById('slot-modal').classList.remove('show');
+  editingSlotId = null;
+}
+
+function saveSlot() {
+  const day = parseInt(document.getElementById('slot-day').value, 10);
+  const start = document.getElementById('slot-start').value;
+  const end = document.getElementById('slot-end').value;
+  const subject = document.getElementById('slot-subject').value;
+  const division = document.getElementById('slot-div').value;
+
+  if (!start || !end) { toast('Please set start and end times'); return; }
+  if (!subject) { toast('Please pick a subject'); return; }
+
+  if (editingSlotId) {
+    const s = data.timetable.find(x => x.id === editingSlotId);
+    if (s) { s.day = day; s.start = start; s.end = end; s.subject = subject; s.division = division; }
+  } else {
+    data.timetable.push({
+      id: 'S' + Date.now() + Math.random().toString(36).slice(2, 6),
+      day, start, end, subject, division
+    });
+  }
+  saveData();
+  closeSlotModal();
+  renderTimetable();
+  toast('Slot saved');
+}
+
+function deleteSlot(id) {
+  if (!confirm('Delete this slot?')) return;
+  data.timetable = data.timetable.filter(s => s.id !== id);
+  saveData();
+  renderTimetable();
+  toast('Slot deleted');
+}
+
+/* ===================== SETTINGS — SUBJECTS ===================== */
+function renderSettings() {
+  renderSubjects();
+  renderStudents();
+  renderAutoBackupStatus();
+  renderPinStatus();
+}
+
+function renderSubjects() {
+  const c = document.getElementById('subjects-list');
+  if (data.subjects.length === 0) {
+    c.innerHTML = `<div class="empty" style="padding: 20px;">No subjects yet</div>`;
+    return;
+  }
+  c.innerHTML = data.subjects.map((s, i) => `
+    <div class="list-item">
+      <div class="list-item-name">${escapeHtml(s)}</div>
+      <div class="list-item-actions">
+        <button class="icon-btn" onclick="editSubject(${i})">✎</button>
+        <button class="icon-btn" onclick="deleteSubject(${i})">🗑</button>
+      </div>
+    </div>`).join('');
+}
+
+function addSubject() {
+  const input = document.getElementById('new-subject');
+  const name = input.value.trim();
+  if (!name) return;
+  if (data.subjects.includes(name)) { toast('Already exists'); return; }
+  data.subjects.push(name);
+  saveData();
+  input.value = '';
+  renderSubjects();
+  toast('Subject added');
+}
+
+function editSubject(i) {
+  const oldName = data.subjects[i];
+  const newName = prompt('Edit subject name:', oldName);
+  if (!newName || !newName.trim() || newName.trim() === oldName) return;
+  const trimmed = newName.trim();
+  if (data.subjects.includes(trimmed)) { toast('Name already exists'); return; }
+  data.subjects[i] = trimmed;
+  data.lectures.forEach(l => { if (l.subject === oldName) l.subject = trimmed; });
+  data.timetable.forEach(s => { if (s.subject === oldName) s.subject = trimmed; });
+  saveData();
+  renderSubjects();
+  toast('Subject renamed');
+}
+
+function deleteSubject(i) {
+  const name = data.subjects[i];
+  const used = data.lectures.some(l => l.subject === name);
+  const msg = used
+    ? `"${name}" is used in past lectures. Delete it anyway? (Past records keep this subject name.)`
+    : `Delete "${name}"?`;
+  if (!confirm(msg)) return;
+  data.subjects.splice(i, 1);
+  saveData();
+  renderSubjects();
+  toast('Subject deleted');
+}
+
+/* ===================== SETTINGS — STUDENTS ===================== */
+let currentStudentDiv = 'A';
+
+function switchStudentDiv(div) {
+  currentStudentDiv = div;
+  document.querySelectorAll('.tab[data-stud-div]').forEach(t => t.classList.toggle('active', t.dataset.studDiv === div));
+  document.getElementById('add-stud-div').textContent = div;
+  renderStudents();
+}
+
+function renderStudents() {
+  const c = document.getElementById('students-list');
+  const list = data.students[currentStudentDiv];
+  c.innerHTML = list.map((name, idx) => `
+    <div class="list-item">
+      <div class="student-roll">${getRoll(currentStudentDiv, idx)}</div>
+      <div class="list-item-name">${escapeHtml(name)}</div>
+      <div class="list-item-actions">
+        <button class="icon-btn" onclick="editStudent(${idx})">✎</button>
+        <button class="icon-btn" onclick="deleteStudent(${idx})">🗑</button>
+      </div>
+    </div>`).join('');
+}
+
+function addStudent() {
+  const input = document.getElementById('new-student');
+  const name = input.value.trim();
+  if (!name) return;
+  data.students[currentStudentDiv].push(name);
+  saveData();
+  input.value = '';
+  renderStudents();
+  toast('Student added');
+}
+
+function editStudent(idx) {
+  const oldName = data.students[currentStudentDiv][idx];
+  const newName = prompt('Edit student name:', oldName);
+  if (!newName || !newName.trim() || newName.trim() === oldName) return;
+  const trimmed = newName.trim();
+  data.students[currentStudentDiv][idx] = trimmed;
+  data.lectures.forEach(l => {
+    if (l.division === currentStudentDiv && l.attendance.hasOwnProperty(oldName)) {
+      l.attendance[trimmed] = l.attendance[oldName];
+      delete l.attendance[oldName];
+      if (l.notes && l.notes[oldName]) {
+        l.notes[trimmed] = l.notes[oldName];
+        delete l.notes[oldName];
+      }
+    }
+  });
+  saveData();
+  renderStudents();
+  toast('Student renamed');
+}
+
+function deleteStudent(idx) {
+  const name = data.students[currentStudentDiv][idx];
+  if (!confirm(`Remove "${name}" from Division ${currentStudentDiv}? Past attendance records will be kept.`)) return;
+  data.students[currentStudentDiv].splice(idx, 1);
+  saveData();
+  renderStudents();
+  toast('Student removed');
+}
+
+/* ===================== BULK IMPORT ===================== */
+function openBulkImportModal() {
+  document.getElementById('bulk-target-div').textContent = currentStudentDiv;
+  document.getElementById('bulk-text').value = '';
+  document.getElementById('bulk-mode').value = 'append';
+  document.getElementById('bulk-preview').textContent = '';
+  document.getElementById('bulk-modal').classList.add('show');
+  document.getElementById('bulk-text').oninput = previewBulkImport;
+}
+
+function closeBulkModal() {
+  document.getElementById('bulk-modal').classList.remove('show');
+}
+
+function parseBulkNames(text) {
+  return text.split(/\r?\n/)
+    .map(line => line.trim())
+    .filter(line => line.length > 0)
+    .map(line => {
+      // Strip leading roll numbers (e.g. "1 Name", "1.  Name", "1) Name", "1\tName")
+      return line.replace(/^\s*\d+\s*[\.\)\:\-\t]?\s*/, '').trim();
+    })
+    .filter(n => n.length > 0);
+}
+
+function previewBulkImport() {
+  const text = document.getElementById('bulk-text').value;
+  const names = parseBulkNames(text);
+  document.getElementById('bulk-preview').textContent = `${names.length} student name${names.length === 1 ? '' : 's'} detected`;
+}
+
+function confirmBulkImport() {
+  const text = document.getElementById('bulk-text').value;
+  const mode = document.getElementById('bulk-mode').value;
+  const names = parseBulkNames(text);
+  if (names.length === 0) { toast('No valid names'); return; }
+
+  if (mode === 'replace') {
+    if (!confirm(`Replace all ${data.students[currentStudentDiv].length} students in Division ${currentStudentDiv} with ${names.length} new names?\n\nPast attendance records will be kept linked to old names, but the active roster will change.`)) return;
+    data.students[currentStudentDiv] = names;
+  } else {
+    data.students[currentStudentDiv] = [...data.students[currentStudentDiv], ...names];
+  }
+  saveData();
+  closeBulkModal();
+  renderStudents();
+  toast(`${names.length} students ${mode === 'replace' ? 'imported' : 'added'}`);
+}
+
+/* ===================== BACKUP & RESTORE ===================== */
+function exportBackup() {
+  const payload = JSON.stringify(data, null, 2);
+  downloadFile(`ClassRegister_Backup_${todayISO()}.json`, payload, 'application/json');
+  localStorage.setItem(LAST_BACKUP_KEY, Date.now().toString());
+  toast('Backup downloaded');
+  renderBackupBanner();
+}
+
+async function shareBackup() {
+  const payload = JSON.stringify(data, null, 2);
+  const filename = `ClassRegister_Backup_${todayISO()}.json`;
+  // Try Web Share API with file
+  if (navigator.canShare) {
+    try {
+      const file = new File([payload], filename, { type: 'application/json' });
+      if (navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: 'Class Register Backup' });
+        localStorage.setItem(LAST_BACKUP_KEY, Date.now().toString());
+        renderBackupBanner();
+        return;
+      }
+    } catch (e) {
+      if (e.name === 'AbortError') return; // user cancelled
+    }
+  }
+  // Fallback to download
+  exportBackup();
+}
+
+function restoreBackup(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const parsed = JSON.parse(e.target.result);
+      if (!parsed.students || !parsed.lectures) throw new Error('Invalid backup');
+      if (!confirm('This will REPLACE all current data with the backup. Continue?')) return;
+      data = parsed;
+      if (!data.subjects) data.subjects = ['General Lecture'];
+      if (!data.timetable) data.timetable = [];
+      if (data.threshold == null) data.threshold = 75;
+      saveData();
+      toast('Backup restored');
+      navTo('home');
+    } catch (err) {
+      alert('Invalid backup file: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
+  event.target.value = '';
+}
+
+function clearAllData() {
+  if (!confirm('This will delete ALL attendance records, students, subjects and timetable. Are you sure?')) return;
+  if (!confirm('Final confirmation: erase everything?')) return;
+  localStorage.removeItem(STORAGE_KEY);
+  localStorage.removeItem(LAST_BACKUP_KEY);
+  data = loadData();
+  saveData();
+  toast('All data cleared');
+  navTo('home');
+}
+
+/* ===================== AUTO BACKUP (File System Access API) ===================== */
+// Using IndexedDB to persist directory handle since localStorage cannot store it.
+const IDB_NAME = 'classRegisterIDB';
+const IDB_STORE = 'handles';
+let _idbPromise;
+function getIDB() {
+  if (_idbPromise) return _idbPromise;
+  _idbPromise = new Promise((resolve, reject) => {
+    const req = indexedDB.open(IDB_NAME, 1);
+    req.onupgradeneeded = e => {
+      e.target.result.createObjectStore(IDB_STORE);
+    };
+    req.onsuccess = e => resolve(e.target.result);
+    req.onerror = e => reject(e.target.error);
+  });
+  return _idbPromise;
+}
+async function idbGet(key) {
+  const db = await getIDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(IDB_STORE, 'readonly');
+    const req = tx.objectStore(IDB_STORE).get(key);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+async function idbSet(key, val) {
+  const db = await getIDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(IDB_STORE, 'readwrite');
+    tx.objectStore(IDB_STORE).put(val, key);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+async function idbDel(key) {
+  const db = await getIDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(IDB_STORE, 'readwrite');
+    tx.objectStore(IDB_STORE).delete(key);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+let _autoBackupHandle = null;
+function getAutoBackupHandle() { return _autoBackupHandle; }
+
+async function setupAutoBackup() {
+  if (!window.showDirectoryPicker) {
+    alert('Your browser does not support automatic folder backup.\n\nThis feature works best in Chrome/Edge on Android or Desktop. As a workaround, use the "Share Backup" button to send to Google Drive manually.');
+    return;
+  }
+  try {
+    const handle = await window.showDirectoryPicker({ mode: 'readwrite' });
+    await idbSet('autoBackupDir', handle);
+    _autoBackupHandle = handle;
+    localStorage.setItem(AUTOBACKUP_KEY, handle.name || 'selected folder');
+    toast('Auto-backup folder set ✓');
+    renderAutoBackupStatus();
+    // Trigger immediate backup
+    await triggerAutoBackup();
+  } catch (e) {
+    if (e.name !== 'AbortError') {
+      alert('Could not set folder: ' + e.message);
+    }
+  }
+}
+
+async function triggerAutoBackup() {
+  if (!_autoBackupHandle) return;
+  try {
+    // Verify permission is still granted
+    const perm = await _autoBackupHandle.queryPermission({ mode: 'readwrite' });
+    if (perm !== 'granted') {
+      const req = await _autoBackupHandle.requestPermission({ mode: 'readwrite' });
+      if (req !== 'granted') return;
+    }
+    const filename = `ClassRegister_Backup_${todayISO()}.json`;
+    const fileHandle = await _autoBackupHandle.getFileHandle(filename, { create: true });
+    const writable = await fileHandle.createWritable();
+    await writable.write(JSON.stringify(data, null, 2));
+    await writable.close();
+    localStorage.setItem(LAST_BACKUP_KEY, Date.now().toString());
+  } catch (e) {
+    console.warn('Auto-backup failed', e);
+  }
+}
+
+async function disableAutoBackup() {
+  if (!confirm('Disable auto-backup to folder?')) return;
+  _autoBackupHandle = null;
+  await idbDel('autoBackupDir');
+  localStorage.removeItem(AUTOBACKUP_KEY);
+  toast('Auto-backup disabled');
+  renderAutoBackupStatus();
+  renderBackupBanner();
+}
+
+function renderAutoBackupStatus() {
+  const c = document.getElementById('auto-backup-status');
+  if (!c) return;
+  const name = localStorage.getItem(AUTOBACKUP_KEY);
+  const last = localStorage.getItem(LAST_BACKUP_KEY);
+  const supported = !!window.showDirectoryPicker;
+
+  if (!supported) {
+    c.innerHTML = `<div class="banner info">
+      <div class="banner-msg">Auto-backup needs Chrome/Edge browser. Use "Share Backup" instead — it opens your phone's share sheet to save to Drive in one tap.</div>
+    </div>`;
+    return;
+  }
+
+  if (_autoBackupHandle && name) {
+    const lastStr = last ? `Last backup: ${new Date(parseInt(last,10)).toLocaleString('en-IN')}` : 'No backup yet';
+    c.innerHTML = `<div class="banner good">
+      <div class="banner-msg"><strong>✓ Auto-backup active</strong><br><span style="font-size:11px;">Folder: ${escapeHtml(name)} · ${lastStr}</span></div>
+      <button onclick="disableAutoBackup()">Disable</button>
+    </div>`;
+  } else if (name && !_autoBackupHandle) {
+    c.innerHTML = `<div class="banner warn">
+      <div class="banner-msg">Auto-backup folder needs to be re-authorized after restart.</div>
+      <button onclick="setupAutoBackup()">Reconnect</button>
+    </div>`;
+  } else {
+    c.innerHTML = `<div class="banner info">
+      <div class="banner-msg">No folder set. Pick a folder once — ideally inside a Google Drive sync folder — and backups will save there automatically.</div>
+    </div>`;
+  }
+}
+
+/* ===================== PIN LOCK ===================== */
+async function hashPin(pin) {
+  // Simple SHA-256 hash; not cryptographically robust but adequate for soft lock
+  const buf = new TextEncoder().encode(pin + '_classRegister_salt');
+  const hash = await crypto.subtle.digest('SHA-256', buf);
+  return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+function hasPin() { return !!localStorage.getItem(PIN_KEY); }
+
+async function setPin(pin) {
+  const h = await hashPin(pin);
+  localStorage.setItem(PIN_KEY, h);
+}
+
+async function checkPin(pin) {
+  const h = await hashPin(pin);
+  return h === localStorage.getItem(PIN_KEY);
+}
+
+function removePin() {
+  localStorage.removeItem(PIN_KEY);
+}
+
+function renderPinStatus() {
+  const c = document.getElementById('pin-status');
+  if (!c) return;
+  if (hasPin()) {
+    c.innerHTML = `
+      <div class="banner good">
+        <div class="banner-msg"><strong>PIN is set</strong> — app will lock on each open.</div>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-ghost" style="flex:1;" onclick="openPinChange()">Change PIN</button>
+        <button class="btn btn-danger" style="flex:1;" onclick="confirmRemovePin()">Remove PIN</button>
+      </div>`;
+  } else {
+    c.innerHTML = `<button class="btn btn-primary btn-block" onclick="openPinSetup()">Set 4-digit PIN</button>`;
+  }
+}
+
+let pinSetupStage = 'new'; // 'new' | 'confirm' | 'change-old'
+let pinSetupTemp = '';
+
+function openPinSetup() {
+  pinSetupStage = 'new';
+  pinSetupTemp = '';
+  document.getElementById('pinsetup-title').textContent = 'Set PIN';
+  document.getElementById('pinsetup-msg').textContent = 'Enter a 4-digit PIN';
+  document.getElementById('pinsetup-input').value = '';
+  document.getElementById('pinsetup-confirm').textContent = 'Continue';
+  document.getElementById('pinsetup-modal').classList.add('show');
+  setTimeout(() => document.getElementById('pinsetup-input').focus(), 100);
+}
+
+function openPinChange() {
+  pinSetupStage = 'change-old';
+  pinSetupTemp = '';
+  document.getElementById('pinsetup-title').textContent = 'Change PIN';
+  document.getElementById('pinsetup-msg').textContent = 'Enter current PIN';
+  document.getElementById('pinsetup-input').value = '';
+  document.getElementById('pinsetup-confirm').textContent = 'Continue';
+  document.getElementById('pinsetup-modal').classList.add('show');
+  setTimeout(() => document.getElementById('pinsetup-input').focus(), 100);
+}
+
+function closePinSetupModal() {
+  document.getElementById('pinsetup-modal').classList.remove('show');
+}
+
+function onPinSetupInput() {
+  // Auto-trigger when 4 digits entered
+  const val = document.getElementById('pinsetup-input').value;
+  if (val.length === 4) {
+    confirmPinSetup();
+  }
+}
+
+async function confirmPinSetup() {
+  const val = document.getElementById('pinsetup-input').value;
+  if (val.length !== 4 || !/^\d{4}$/.test(val)) {
+    toast('PIN must be exactly 4 digits');
+    return;
+  }
+  if (pinSetupStage === 'change-old') {
+    if (!await checkPin(val)) {
+      toast('Wrong PIN');
+      document.getElementById('pinsetup-input').value = '';
+      return;
+    }
+    pinSetupStage = 'new';
+    pinSetupTemp = '';
+    document.getElementById('pinsetup-title').textContent = 'New PIN';
+    document.getElementById('pinsetup-msg').textContent = 'Enter new 4-digit PIN';
+    document.getElementById('pinsetup-input').value = '';
+  } else if (pinSetupStage === 'new') {
+    pinSetupTemp = val;
+    pinSetupStage = 'confirm';
+    document.getElementById('pinsetup-title').textContent = 'Confirm PIN';
+    document.getElementById('pinsetup-msg').textContent = 'Re-enter to confirm';
+    document.getElementById('pinsetup-input').value = '';
+  } else if (pinSetupStage === 'confirm') {
+    if (val !== pinSetupTemp) {
+      toast('PINs do not match');
+      pinSetupStage = 'new';
+      pinSetupTemp = '';
+      document.getElementById('pinsetup-title').textContent = 'Set PIN';
+      document.getElementById('pinsetup-msg').textContent = 'Enter a 4-digit PIN';
+      document.getElementById('pinsetup-input').value = '';
+      return;
+    }
+    await setPin(val);
+    closePinSetupModal();
+    renderPinStatus();
+    toast('PIN set ✓');
+  }
+}
+
+async function confirmRemovePin() {
+  const pin = prompt('Enter current PIN to remove:');
+  if (!pin) return;
+  if (!await checkPin(pin)) { toast('Wrong PIN'); return; }
+  removePin();
+  renderPinStatus();
+  toast('PIN removed');
+}
+
+/* ===================== PIN LOCK SCREEN ===================== */
+let lockPinEntry = '';
+
+function showLockScreen() {
+  document.getElementById('lock-screen').classList.remove('hidden');
+  lockPinEntry = '';
+  document.getElementById('pin-input').value = '';
+  buildKeypad();
+}
+
+function hideLockScreen() {
+  document.getElementById('lock-screen').classList.add('hidden');
+}
+
+function buildKeypad() {
+  const kp = document.getElementById('pin-keypad');
+  const keys = ['1','2','3','4','5','6','7','8','9','','0','⌫'];
+  kp.innerHTML = keys.map(k => {
+    if (k === '') return '<div></div>';
+    if (k === '⌫') return `<button class="pin-key action" onclick="lockKeyPress('back')">⌫</button>`;
+    return `<button class="pin-key" onclick="lockKeyPress('${k}')">${k}</button>`;
+  }).join('');
+}
+
+async function lockKeyPress(k) {
+  if (k === 'back') {
+    lockPinEntry = lockPinEntry.slice(0, -1);
+  } else if (lockPinEntry.length < 4) {
+    lockPinEntry += k;
+  }
+  document.getElementById('pin-input').value = '•'.repeat(lockPinEntry.length);
+  if (lockPinEntry.length === 4) {
+    if (await checkPin(lockPinEntry)) {
+      hideLockScreen();
+    } else {
+      toast('Wrong PIN');
+      lockPinEntry = '';
+      document.getElementById('pin-input').value = '';
+      // Vibrate on error if available
+      if (navigator.vibrate) navigator.vibrate(200);
+    }
+  }
+}
+
+/* ===================== INIT ===================== */
+window.addEventListener('load', async () => {
+  if (!localStorage.getItem(STORAGE_KEY)) saveData();
+
+  // Restore auto-backup handle from IndexedDB
+  try {
+    const handle = await idbGet('autoBackupDir');
+    if (handle) {
+      const perm = await handle.queryPermission({ mode: 'readwrite' });
+      if (perm === 'granted') {
+        _autoBackupHandle = handle;
+      } else {
+        // Will require re-grant on next backup
+        _autoBackupHandle = handle;
+      }
+    }
+  } catch (e) {
+    console.warn('Could not restore auto-backup handle', e);
+  }
+
+  // PIN check
+  if (hasPin()) {
+    showLockScreen();
+  }
+
+  navTo('home');
+});
+
+// Re-render today's schedule when returning to app
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && !document.getElementById('tab-home').classList.contains('hidden')) {
+    renderHome();
+  }
+});
+
+// Service worker registration for offline support
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(err => console.warn('SW registration failed', err));
+  });
+}
+</script>
+</body>
+</html>
