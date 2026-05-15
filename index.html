@@ -785,6 +785,11 @@ nav.bottom-nav {
       </div>
     </div>
 
+    <div class="card" id="data-health-card">
+      <h3>🛡 Data Safety</h3>
+      <div id="data-health-content"></div>
+    </div>
+
     <div class="card">
       <h2 class="serif">Today's Schedule</h2>
       <div id="today-schedule"></div>
@@ -1067,13 +1072,30 @@ nav.bottom-nav {
       <div id="auto-backup-status" style="margin-bottom: 12px;"></div>
       <div style="display: flex; flex-direction: column; gap: 8px;">
         <button class="btn btn-primary btn-block" onclick="setupAutoBackup()">📁 Set Auto-Backup Folder</button>
+        <button class="btn btn-accent btn-block" onclick="emailBackupToSelf()">📧 Email Backup to Self</button>
         <button class="btn btn-ghost btn-block" onclick="exportBackup()">⬇ Download Manual Backup</button>
         <button class="btn btn-ghost btn-block" onclick="shareBackup()">📤 Share Backup (to Drive/Email)</button>
         <label class="btn btn-ghost btn-block" style="cursor: pointer;">
-          ⬆ Restore from Backup
+          ⬆ Restore from Backup File
           <input type="file" accept=".json" onchange="restoreBackup(event)" style="display: none;">
         </label>
       </div>
+    </div>
+
+    <div class="card">
+      <h2 class="serif">Daily Snapshots</h2>
+      <p style="font-size: 13px; color: var(--ink-muted); margin: 0 0 12px;">
+        The app silently saves a snapshot of all your data once per day. If anything goes wrong, you can roll back to any of the last 7 days.
+      </p>
+      <div id="snapshots-list"></div>
+    </div>
+
+    <div class="card">
+      <h2 class="serif">🎓 Practice Restore</h2>
+      <p style="font-size: 13px; color: var(--ink-muted); margin: 0 0 12px;">
+        Practice the backup-and-restore process BEFORE you ever need it. Five minutes now saves you in a crisis.
+      </p>
+      <button class="btn btn-primary btn-block" onclick="openRestoreTestWizard()">Start Practice Run</button>
     </div>
 
     <div class="card">
@@ -1259,6 +1281,29 @@ nav.bottom-nav {
     <div style="display: flex; gap: 8px;">
       <button class="btn btn-ghost" onclick="closePinSetupModal()" style="flex:1;">Cancel</button>
       <button class="btn btn-primary" onclick="confirmPinSetup()" style="flex:1;" id="pinsetup-confirm">Continue</button>
+    </div>
+  </div>
+</div>
+
+<!-- RESTORE TEST WIZARD -->
+<div class="modal-overlay" id="restore-wizard-modal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeRestoreTestWizard()">×</button>
+    <h3 id="rw-title">Practice Run</h3>
+    <div id="rw-content"></div>
+    <div style="display: flex; gap: 8px; margin-top: 14px;" id="rw-actions"></div>
+  </div>
+</div>
+
+<!-- SNAPSHOT RESTORE MODAL -->
+<div class="modal-overlay" id="snapshot-modal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeSnapshotModal()">×</button>
+    <h3 id="snapshot-modal-title">Restore from Snapshot</h3>
+    <div id="snapshot-modal-content"></div>
+    <div style="display: flex; gap: 8px; margin-top: 14px;">
+      <button class="btn btn-ghost" onclick="closeSnapshotModal()" style="flex:1;">Cancel</button>
+      <button class="btn btn-danger" id="snapshot-restore-btn" style="flex:1;">Restore This Snapshot</button>
     </div>
   </div>
 </div>
@@ -1490,6 +1535,9 @@ function renderHome() {
   } else {
     container.innerHTML = recent.map(l => historyItemHTML(l)).join('');
   }
+
+  // Render data health card
+  renderDataHealth();
 }
 
 function renderTodaySchedule() {
@@ -1534,36 +1582,57 @@ function historyItemHTML(l) {
     </div>`;
 }
 
-/* ===================== BACKUP REMINDER BANNER ===================== */
+/* ===================== BACKUP REMINDER BANNER (enhanced) ===================== */
 function renderBackupBanner() {
   const area = document.getElementById('banner-area');
+  if (!area) return;
   area.innerHTML = '';
 
   const last = localStorage.getItem(LAST_BACKUP_KEY);
-  const auto = getAutoBackupHandle();
   const lectureCount = data.lectures.length;
-
   if (lectureCount === 0) return;
 
-  if (auto) {
-    // Auto-backup is set; no banner needed unless errors
+  const auto = !!_autoBackupHandle;
+  const daysSince = last ? Math.floor((Date.now() - parseInt(last, 10)) / 86400000) : 999;
+  const lecturesSince = last
+    ? data.lectures.filter(l => l.createdAt > parseInt(last, 10)).length
+    : lectureCount;
+
+  // If auto-backup is active and last backup is fresh, no banner
+  if (auto && daysSince < 7) return;
+
+  // High urgency
+  if ((!last && lectureCount >= 5) || daysSince >= 14) {
+    area.innerHTML = `
+      <div class="banner warn">
+        <div class="banner-msg">
+          <strong>🚨 Backup overdue.</strong> ${last ? daysSince + ' days since last backup.' : 'You have not backed up yet.'} Don't risk data loss.
+        </div>
+        <button onclick="emailBackupToSelf()">Email Backup</button>
+      </div>`;
     return;
   }
 
-  // Calculate lectures since last backup
-  let lecturesSince = lectureCount;
-  if (last) {
-    const lastBackupTime = parseInt(last, 10);
-    lecturesSince = data.lectures.filter(l => l.createdAt > lastBackupTime).length;
+  // Sunday gentle reminder
+  if (checkWeeklyReminder()) {
+    area.innerHTML = `
+      <div class="banner info">
+        <div class="banner-msg">
+          <strong>📅 Weekly backup reminder.</strong> ${lecturesSince} new ${lecturesSince === 1 ? 'lecture' : 'lectures'} since last backup.
+        </div>
+        <button onclick="emailBackupToSelf()">Backup Now</button>
+      </div>`;
+    return;
   }
 
-  if (lecturesSince >= 5 || !last) {
+  // Standard threshold reminder
+  if (lecturesSince >= 5) {
     area.innerHTML = `
       <div class="banner warn">
         <div class="banner-msg">
           <strong>Backup recommended.</strong> ${lecturesSince} new ${lecturesSince === 1 ? 'lecture' : 'lectures'} since last backup.
         </div>
-        <button onclick="exportBackup()">Backup Now</button>
+        <button onclick="emailBackupToSelf()">Email Backup</button>
       </div>`;
   }
 }
@@ -2575,6 +2644,7 @@ function renderSettings() {
   renderStudents();
   renderAutoBackupStatus();
   renderPinStatus();
+  renderSnapshotsList();
 }
 
 function renderSubjects() {
@@ -3783,6 +3853,560 @@ function setCustomThreshold(name, div) {
 }
 
 
+/* ===================== DAILY SNAPSHOTS (Layer 4) ===================== */
+const SNAPSHOT_STORE = 'snapshots';
+
+async function getSnapshotIDB() {
+  const db = await getIDB();
+  if (!db.objectStoreNames.contains(SNAPSHOT_STORE)) {
+    db.close();
+    _idbPromise = null;
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open(IDB_NAME, 2);
+      req.onupgradeneeded = e => {
+        const newDb = e.target.result;
+        if (!newDb.objectStoreNames.contains(IDB_STORE)) newDb.createObjectStore(IDB_STORE);
+        if (!newDb.objectStoreNames.contains(SNAPSHOT_STORE)) newDb.createObjectStore(SNAPSHOT_STORE);
+      };
+      req.onsuccess = e => {
+        _idbPromise = Promise.resolve(e.target.result);
+        resolve(e.target.result);
+      };
+      req.onerror = e => reject(e.target.error);
+    });
+  }
+  return db;
+}
+
+async function saveSnapshot(key, value) {
+  try {
+    const db = await getSnapshotIDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(SNAPSHOT_STORE, 'readwrite');
+      tx.objectStore(SNAPSHOT_STORE).put(value, key);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  } catch (e) { console.warn('Snapshot save failed', e); }
+}
+
+async function getSnapshot(key) {
+  try {
+    const db = await getSnapshotIDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(SNAPSHOT_STORE, 'readonly');
+      const req = tx.objectStore(SNAPSHOT_STORE).get(key);
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  } catch (e) { return null; }
+}
+
+async function listSnapshotKeys() {
+  try {
+    const db = await getSnapshotIDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(SNAPSHOT_STORE, 'readonly');
+      const req = tx.objectStore(SNAPSHOT_STORE).getAllKeys();
+      req.onsuccess = () => resolve(req.result || []);
+      req.onerror = () => reject(req.error);
+    });
+  } catch (e) { return []; }
+}
+
+async function deleteSnapshot(key) {
+  try {
+    const db = await getSnapshotIDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(SNAPSHOT_STORE, 'readwrite');
+      tx.objectStore(SNAPSHOT_STORE).delete(key);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  } catch (e) {}
+}
+
+async function maybeSaveDailySnapshot() {
+  const today = todayISO();
+  const lastSnapshotDate = localStorage.getItem('classRegister_lastSnapshot');
+  if (lastSnapshotDate === today) return;
+
+  const snapshot = {
+    date: today,
+    savedAt: Date.now(),
+    data: JSON.parse(JSON.stringify(data))
+  };
+  await saveSnapshot('day_' + today, snapshot);
+  localStorage.setItem('classRegister_lastSnapshot', today);
+
+  // Prune to 7 most recent
+  const keys = (await listSnapshotKeys()).filter(k => k.startsWith('day_')).sort();
+  while (keys.length > 7) {
+    const oldest = keys.shift();
+    await deleteSnapshot(oldest);
+  }
+}
+
+async function renderSnapshotsList() {
+  const c = document.getElementById('snapshots-list');
+  if (!c) return;
+  const keys = (await listSnapshotKeys()).filter(k => k.startsWith('day_')).sort().reverse();
+  if (keys.length === 0) {
+    c.innerHTML = '<div style="font-size:12px;color:var(--ink-muted);padding:6px 0;">No snapshots yet. The first one saves automatically next time you open the app on a new day.</div>';
+    return;
+  }
+  const items = await Promise.all(keys.map(async k => {
+    const snap = await getSnapshot(k);
+    if (!snap) return '';
+    const dateStr = formatDate(snap.date);
+    const lectureCount = snap.data.lectures ? snap.data.lectures.length : 0;
+    const ago = Math.floor((Date.now() - snap.savedAt) / 86400000);
+    const agoStr = ago === 0 ? 'today' : ago === 1 ? 'yesterday' : ago + ' days ago';
+    return `
+      <div class="list-item">
+        <div style="flex:1;">
+          <div style="font-weight:600;font-size:14px;">${dateStr}</div>
+          <div style="font-size:11px;color:var(--ink-muted);">${lectureCount} lectures · saved ${agoStr}</div>
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="openSnapshotRestore('${k}')">Restore</button>
+      </div>`;
+  }));
+  c.innerHTML = items.join('');
+}
+
+let _currentSnapshotKey = null;
+async function openSnapshotRestore(key) {
+  const snap = await getSnapshot(key);
+  if (!snap) { toast('Snapshot not found'); return; }
+  _currentSnapshotKey = key;
+  document.getElementById('snapshot-modal-title').textContent = 'Restore from ' + formatDate(snap.date);
+  document.getElementById('snapshot-modal-content').innerHTML = `
+    <div class="banner warn">
+      <div class="banner-msg">
+        <strong>⚠ This will REPLACE all current data.</strong><br>
+        <span style="font-size:11px;">Snapshot from ${formatDate(snap.date)} · ${snap.data.lectures ? snap.data.lectures.length : 0} lectures · ${(snap.data.students.A.length + snap.data.students.B.length)} students</span>
+      </div>
+    </div>
+    <p style="font-size:13px;color:var(--ink-muted);margin-top:10px;">
+      Tip: Download a manual backup of <em>current</em> data first (Settings → Download Manual Backup), in case you change your mind.
+    </p>
+  `;
+  document.getElementById('snapshot-restore-btn').onclick = confirmSnapshotRestore;
+  document.getElementById('snapshot-modal').classList.add('show');
+}
+
+function closeSnapshotModal() {
+  document.getElementById('snapshot-modal').classList.remove('show');
+  _currentSnapshotKey = null;
+}
+
+async function confirmSnapshotRestore() {
+  if (!_currentSnapshotKey) return;
+  if (!confirm('Final confirmation: this will completely replace your current data with the snapshot. Continue?')) return;
+  const snap = await getSnapshot(_currentSnapshotKey);
+  if (!snap || !snap.data) { toast('Snapshot invalid'); return; }
+  data = snap.data;
+  if (!data.studentMeta) data.studentMeta = { A: {}, B: {} };
+  if (!data.examTypes) data.examTypes = INITIAL_DATA.examTypes;
+  if (!data.cancelledDates) data.cancelledDates = [];
+  if (!data.timetable) data.timetable = [];
+  saveData();
+  closeSnapshotModal();
+  toast('Snapshot restored ✓');
+  navTo('home');
+}
+
+/* ===================== EMAIL BACKUP (Layer 3) ===================== */
+async function emailBackupToSelf() {
+  const payload = JSON.stringify(data, null, 2);
+  const filename = `ClassRegister_Backup_${todayISO()}.json`;
+  const subject = `Class Register Backup — ${todayISO()}`;
+  const body = `Backup attached. Save this email for your records.
+
+Stats:
+- Lectures: ${data.lectures.length}
+- Students Div A: ${data.students.A.length}
+- Students Div B: ${data.students.B.length}
+- Subjects: ${data.subjects.length}
+
+The attached JSON file is your full backup. To restore, open Class Register → Settings → Restore from Backup File.
+
+Generated by Class Register.`;
+
+  if (navigator.canShare) {
+    try {
+      const file = new File([payload], filename, { type: 'application/json' });
+      if (navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          files: [file],
+          title: subject,
+          text: body
+        });
+        localStorage.setItem(LAST_BACKUP_KEY, Date.now().toString());
+        renderBackupBanner();
+        renderDataHealth();
+        return;
+      }
+    } catch (e) {
+      if (e.name === 'AbortError') return;
+    }
+  }
+
+  downloadFile(filename, payload, 'application/json');
+  const mailto = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body + '\n\n(Attach the downloaded backup file before sending.)')}`;
+  setTimeout(() => {
+    if (confirm('Backup downloaded. Open email now to attach and send?')) {
+      window.location.href = mailto;
+    }
+  }, 500);
+  localStorage.setItem(LAST_BACKUP_KEY, Date.now().toString());
+  renderBackupBanner();
+  renderDataHealth();
+}
+
+/* ===================== DATA HEALTH (Layer 5) ===================== */
+function renderDataHealth() {
+  const c = document.getElementById('data-health-content');
+  if (!c) return;
+
+  const last = localStorage.getItem(LAST_BACKUP_KEY);
+  const autoFolder = localStorage.getItem(AUTOBACKUP_KEY);
+  const lectureCount = data.lectures.length;
+  const studentCount = data.students.A.length + data.students.B.length;
+
+  let status, statusColor, statusIcon;
+  let recommendations = [];
+
+  if (lectureCount === 0) {
+    status = "Setup mode";
+    statusColor = "info";
+    statusIcon = "🌱";
+    recommendations.push("Add your subjects in Settings");
+    recommendations.push("Set up auto-backup folder for safety");
+  } else {
+    const daysSinceLastBackup = last ? Math.floor((Date.now() - parseInt(last, 10)) / 86400000) : null;
+    const hasAutoBackup = !!_autoBackupHandle;
+
+    if (hasAutoBackup) {
+      status = "Protected";
+      statusColor = "good";
+      statusIcon = "✅";
+    } else if (last && daysSinceLastBackup <= 3) {
+      status = "Good";
+      statusColor = "good";
+      statusIcon = "✓";
+    } else if (last && daysSinceLastBackup <= 7) {
+      status = "Backup soon";
+      statusColor = "warn";
+      statusIcon = "⚠️";
+      recommendations.push("Last backup was " + daysSinceLastBackup + " days ago. Tap 'Email Backup' below.");
+    } else if (last) {
+      status = "BACKUP NEEDED";
+      statusColor = "warn";
+      statusIcon = "⚠️";
+      recommendations.push("Last backup was " + daysSinceLastBackup + " days ago. Back up now.");
+    } else {
+      status = "NEVER BACKED UP";
+      statusColor = "warn";
+      statusIcon = "🚨";
+      recommendations.push("You haven't backed up yet. Set up auto-backup in Settings.");
+    }
+
+    if (!hasAutoBackup && !autoFolder) {
+      recommendations.push("Set an auto-backup folder so this happens automatically.");
+    }
+  }
+
+  const lastStr = last ? new Date(parseInt(last, 10)).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : 'Never';
+  const autoStr = _autoBackupHandle ? `Active (folder: ${autoFolder || 'set'})` : (autoFolder ? 'Needs re-authorization' : 'Not set');
+
+  c.innerHTML = `
+    <div class="banner ${statusColor}" style="margin-bottom: 12px;">
+      <div class="banner-msg">
+        <strong>${statusIcon} ${status}</strong>
+      </div>
+    </div>
+    <div style="font-size: 12px; line-height: 1.7; color: var(--ink-soft); margin-bottom: 10px;">
+      📁 Auto-backup: <strong>${autoStr}</strong><br>
+      💾 Last manual backup: <strong>${lastStr}</strong><br>
+      📊 ${lectureCount} lectures · ${studentCount} students
+    </div>
+    ${recommendations.length > 0 ? `
+      <div style="background: var(--bg-soft); padding: 10px; border-radius: 8px; font-size: 12px; margin-bottom: 10px;">
+        ${recommendations.map(r => `• ${r}`).join('<br>')}
+      </div>
+    ` : ''}
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
+      <button class="btn btn-accent btn-sm" onclick="emailBackupToSelf()">📧 Email Backup</button>
+      <button class="btn btn-ghost btn-sm" onclick="navTo('settings')">⚙ Backup Settings</button>
+    </div>
+  `;
+}
+
+/* ===================== WEEKLY REMINDER (Layer 2) ===================== */
+function checkWeeklyReminder() {
+  const last = localStorage.getItem(LAST_BACKUP_KEY);
+  if (data.lectures.length === 0) return false;
+  if (!last) return true;
+
+  const daysSince = Math.floor((Date.now() - parseInt(last, 10)) / 86400000);
+  const today = new Date().getDay();
+  const isWeekendReminder = today === 0 && daysSince >= 3;
+  const isOverdue = daysSince >= 7;
+
+  if (_autoBackupHandle && daysSince < 14) return false;
+  return isWeekendReminder || isOverdue;
+}
+
+/* ===================== RESTORE TEST WIZARD ===================== */
+let rwStep = 0;
+let rwTestData = null;
+
+function openRestoreTestWizard() {
+  rwStep = 0;
+  rwTestData = null;
+  document.getElementById('restore-wizard-modal').classList.add('show');
+  renderRestoreWizardStep();
+}
+
+function closeRestoreTestWizard() {
+  document.getElementById('restore-wizard-modal').classList.remove('show');
+  rwStep = 0;
+  rwTestData = null;
+}
+
+function renderRestoreWizardStep() {
+  const title = document.getElementById('rw-title');
+  const content = document.getElementById('rw-content');
+  const actions = document.getElementById('rw-actions');
+
+  switch (rwStep) {
+    case 0:
+      title.textContent = 'Step 1 of 5 — Why practice?';
+      content.innerHTML = `
+        <p style="font-size:13px;line-height:1.6;">
+          Backing up is easy. <strong>Restoring is the part that scares people during a real crisis.</strong>
+        </p>
+        <p style="font-size:13px;line-height:1.6;">
+          This 5-minute walkthrough will:
+        </p>
+        <ul style="font-size:13px;line-height:1.7;padding-left:20px;">
+          <li>Save your current data safely first</li>
+          <li>Create a fake test lecture</li>
+          <li>Backup → ask you to confirm it worked</li>
+          <li>Wipe the test data (simulation only)</li>
+          <li>Restore from the backup</li>
+          <li>Restore your original data</li>
+        </ul>
+        <p style="font-size:13px;line-height:1.6;color:var(--ink-muted);">
+          Your real data is <strong>never at risk</strong> — we save it before starting and restore at the end.
+        </p>
+      `;
+      actions.innerHTML = `
+        <button class="btn btn-ghost" onclick="closeRestoreTestWizard()" style="flex:1;">Not now</button>
+        <button class="btn btn-primary" onclick="rwStep=1;renderRestoreWizardStep()" style="flex:1;">I'm Ready →</button>
+      `;
+      break;
+
+    case 1:
+      title.textContent = 'Step 2 of 5 — Safety snapshot';
+      rwTestData = JSON.parse(JSON.stringify(data));
+      content.innerHTML = `
+        <p style="font-size:13px;line-height:1.6;">
+          ✅ Your real data is now safely stored in memory.
+        </p>
+        <p style="font-size:13px;line-height:1.6;">
+          Next, we'll add a fake lecture so you can see how backup/restore works without touching your real records.
+        </p>
+        <div style="background:var(--bg-soft);padding:10px;border-radius:8px;font-size:12px;">
+          <strong>Original data:</strong><br>
+          • ${rwTestData.lectures.length} lectures<br>
+          • ${rwTestData.students.A.length + rwTestData.students.B.length} students<br>
+          • ${rwTestData.subjects.length} subjects
+        </div>
+      `;
+      actions.innerHTML = `
+        <button class="btn btn-ghost" onclick="rwAbort()" style="flex:1;">Stop & Restore</button>
+        <button class="btn btn-primary" onclick="rwAddTestLecture()" style="flex:1;">Add Test Lecture →</button>
+      `;
+      break;
+
+    case 2:
+      title.textContent = 'Step 3 of 5 — Backup the test';
+      content.innerHTML = `
+        <p style="font-size:13px;line-height:1.6;">
+          ✅ Added a test lecture called "PRACTICE TEST RUN — please ignore".
+        </p>
+        <p style="font-size:13px;line-height:1.6;">
+          Now tap the button below. It will trigger a real backup the same way you'd do during normal use. Save it to Drive, email, or downloads — your choice.
+        </p>
+        <p style="font-size:13px;line-height:1.6;color:var(--ink-muted);">
+          <strong>Remember where you saved the backup file.</strong> We'll restore from it next.
+        </p>
+      `;
+      actions.innerHTML = `
+        <button class="btn btn-ghost" onclick="rwAbort()" style="flex:1;">Stop & Restore</button>
+        <button class="btn btn-accent" onclick="rwTriggerBackup()" style="flex:1;">📤 Backup Now</button>
+      `;
+      break;
+
+    case 3:
+      title.textContent = 'Step 4 of 5 — Wipe & Restore';
+      content.innerHTML = `
+        <p style="font-size:13px;line-height:1.6;">
+          ✅ Backup made.
+        </p>
+        <p style="font-size:13px;line-height:1.6;">
+          Now we'll simulate the worst case — pretending you lost everything. The app will wipe all data, and you'll restore from the backup you just made.
+        </p>
+        <div class="banner warn">
+          <div class="banner-msg">
+            This is a <strong>simulation</strong>. Your real data is still safely stored. We'll restore it for you after the test.
+          </div>
+        </div>
+      `;
+      actions.innerHTML = `
+        <button class="btn btn-ghost" onclick="rwAbort()" style="flex:1;">Stop & Restore</button>
+        <button class="btn btn-danger" onclick="rwSimulateWipe()" style="flex:1;">Simulate Wipe →</button>
+      `;
+      break;
+
+    case 4:
+      title.textContent = 'Step 5 of 5 — Restore from your backup';
+      content.innerHTML = `
+        <p style="font-size:13px;line-height:1.6;">
+          ✅ App is now wiped (test mode).
+        </p>
+        <p style="font-size:13px;line-height:1.6;">
+          Now do this:
+        </p>
+        <ol style="font-size:13px;line-height:1.7;padding-left:20px;">
+          <li>Find the backup file you just made (in your Drive folder, email, or downloads)</li>
+          <li>Tap the button below</li>
+          <li>Pick that file</li>
+        </ol>
+        <p style="font-size:13px;line-height:1.6;">
+          The test data should come back, including the fake lecture.
+        </p>
+      `;
+      actions.innerHTML = `
+        <button class="btn btn-ghost" onclick="rwFinishWithoutRestore()" style="flex:1;">Skip & Restore Original</button>
+        <label class="btn btn-accent" style="flex:1;cursor:pointer;">
+          📁 Pick Backup File
+          <input type="file" accept=".json" onchange="rwHandleRestore(event)" style="display:none;">
+        </label>
+      `;
+      break;
+
+    case 5:
+      title.textContent = '✓ Done — Restoring your original data';
+      content.innerHTML = `
+        <p style="font-size:13px;line-height:1.6;">
+          🎉 Great work! You now know how to recover from a real data loss event.
+        </p>
+        <p style="font-size:13px;line-height:1.6;">
+          We're now restoring your original real data and clearing the test lecture.
+        </p>
+      `;
+      actions.innerHTML = `
+        <button class="btn btn-primary" onclick="rwFinish()" style="flex:1;">Finish</button>
+      `;
+      break;
+  }
+}
+
+function rwAbort() {
+  if (rwTestData) {
+    data = rwTestData;
+    saveData();
+  }
+  closeRestoreTestWizard();
+  toast('Original data restored');
+  navTo('home');
+}
+
+function rwAddTestLecture() {
+  const testLecture = {
+    id: 'L_TEST_' + Date.now(),
+    date: todayISO(),
+    division: 'A',
+    subject: 'PRACTICE TEST RUN — please ignore',
+    time: 'TEST',
+    attendance: {},
+    notes: {},
+    isMakeup: false,
+    makeupOriginal: '',
+    createdAt: Date.now(),
+    _isTest: true
+  };
+  if (data.students.A.length > 0) {
+    testLecture.attendance[data.students.A[0]] = 'P';
+  }
+  data.lectures.push(testLecture);
+  saveData();
+  rwStep = 2;
+  renderRestoreWizardStep();
+}
+
+function rwTriggerBackup() {
+  emailBackupToSelf();
+  setTimeout(() => {
+    rwStep = 3;
+    renderRestoreWizardStep();
+  }, 1500);
+}
+
+function rwSimulateWipe() {
+  data = JSON.parse(JSON.stringify(INITIAL_DATA));
+  renderHome();
+  rwStep = 4;
+  renderRestoreWizardStep();
+}
+
+function rwHandleRestore(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const parsed = JSON.parse(e.target.result);
+      if (!parsed.students || !parsed.lectures) throw new Error('Invalid');
+      const hasTestLecture = parsed.lectures.some(l => l._isTest || (l.subject && l.subject.includes('PRACTICE TEST RUN')));
+      if (!hasTestLecture) {
+        if (!confirm('This backup does not contain the test lecture we just created. Are you sure this is the right file? Continue anyway?')) return;
+      }
+      data = parsed;
+      saveData();
+      renderHome();
+      toast('✓ Test restore worked!');
+      rwStep = 5;
+      renderRestoreWizardStep();
+    } catch (err) {
+      alert('That file is not a valid backup. Try again.\nError: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
+  event.target.value = '';
+}
+
+function rwFinishWithoutRestore() {
+  if (confirm('Skip the restore test and just put back your original data?')) {
+    rwStep = 5;
+    renderRestoreWizardStep();
+  }
+}
+
+function rwFinish() {
+  if (rwTestData) {
+    data = rwTestData;
+    saveData();
+  }
+  closeRestoreTestWizard();
+  toast('✓ Practice complete. Your original data is back.');
+  navTo('home');
+}
+
+
 window.addEventListener('load', async () => {
   if (!localStorage.getItem(STORAGE_KEY)) saveData();
 
@@ -3794,12 +4418,18 @@ window.addEventListener('load', async () => {
       if (perm === 'granted') {
         _autoBackupHandle = handle;
       } else {
-        // Will require re-grant on next backup
         _autoBackupHandle = handle;
       }
     }
   } catch (e) {
     console.warn('Could not restore auto-backup handle', e);
+  }
+
+  // Save daily snapshot if we haven't already today
+  try {
+    await maybeSaveDailySnapshot();
+  } catch (e) {
+    console.warn('Daily snapshot save failed', e);
   }
 
   // PIN check
