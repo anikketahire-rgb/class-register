@@ -795,6 +795,8 @@ nav.bottom-nav {
       <div class="quick-actions">
         <button class="btn btn-primary" onclick="goToMark()">+ Mark Attendance</button>
         <button class="btn btn-ghost" onclick="navTo('reports')">View Reports</button>
+        <button class="btn btn-ghost" onclick="navTo('insights')">💡 Insights</button>
+        <button class="btn btn-ghost" onclick="navTo('gradebook')">🎓 Gradebook</button>
         <button class="btn btn-ghost" onclick="navTo('compare')">Compare</button>
         <button class="btn btn-ghost" onclick="navTo('search')">Find Student</button>
       </div>
@@ -828,6 +830,14 @@ nav.bottom-nav {
       <div class="field">
         <label>Lecture Time (optional)</label>
         <input type="text" id="mark-time" placeholder="e.g. 10:00 - 11:00 AM">
+      </div>
+      <div class="field" style="display: flex; align-items: center; gap: 10px;">
+        <input type="checkbox" id="mark-makeup" style="width: auto; margin: 0;">
+        <label for="mark-makeup" style="margin: 0; cursor: pointer;">This is a MAKEUP lecture (replacing a cancelled one)</label>
+      </div>
+      <div class="field hidden" id="makeup-original-wrap">
+        <label>Original cancelled date being replaced (optional)</label>
+        <input type="date" id="mark-makeup-original">
       </div>
     </div>
 
@@ -933,6 +943,7 @@ nav.bottom-nav {
         <button class="btn btn-ghost btn-sm" onclick="exportDetailedCSV()">📊 Detailed CSV</button>
         <button class="btn btn-primary btn-sm" onclick="exportPDF()">📑 Formal PDF</button>
         <button class="btn btn-ghost btn-sm" onclick="exportDefaulterPDF()">⚠️ Defaulter PDF</button>
+        <button class="btn btn-accent btn-sm" onclick="exportWhatsApp()" style="grid-column: span 2;">📤 Copy Defaulter List for WhatsApp</button>
       </div>
       <div id="report-summary"></div>
       <div class="divider"></div>
@@ -973,6 +984,76 @@ nav.bottom-nav {
       </p>
       <div id="timetable-content"></div>
       <button class="btn btn-primary btn-block" onclick="openAddSlotModal()" style="margin-top:10px;">+ Add Lecture Slot</button>
+    </div>
+  </section>
+
+  <!-- INSIGHTS TAB -->
+  <section id="tab-insights" class="hidden">
+    <div class="card">
+      <h2 class="serif">Insights</h2>
+      <div class="field-row">
+        <div class="field">
+          <label>Division</label>
+          <select id="ins-div" onchange="renderInsights()">
+            <option value="A">Division A</option>
+            <option value="B">Division B</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Lookback Window</label>
+          <select id="ins-window" onchange="renderInsights()">
+            <option value="5">Last 5 lectures</option>
+            <option value="10" selected>Last 10 lectures</option>
+            <option value="20">Last 20 lectures</option>
+            <option value="0">All time</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>📉 Trending Down</h3>
+      <p style="font-size:12px;color:var(--ink-muted);margin:0 0 10px;">Students whose recent attendance is meaningfully worse than their overall record.</p>
+      <div id="trending-down"></div>
+    </div>
+
+    <div class="card">
+      <h3>⚠️ Currently Absent Streak</h3>
+      <p style="font-size:12px;color:var(--ink-muted);margin:0 0 10px;">Students absent in their last several consecutive lectures. Often the earliest warning sign.</p>
+      <div id="absent-streak"></div>
+    </div>
+
+    <div class="card">
+      <h3>🔄 Weekly Pattern Skippers</h3>
+      <p style="font-size:12px;color:var(--ink-muted);margin:0 0 10px;">Students absent on specific weekdays disproportionately often. Highlights systematic skipping.</p>
+      <div id="day-patterns"></div>
+    </div>
+
+    <div class="card">
+      <h3>📅 Cancelled / Holiday Dates</h3>
+      <p style="font-size:12px;color:var(--ink-muted);margin:0 0 10px;">Mark dates as cancelled/holiday so they don't count against students.</p>
+      <div class="field">
+        <label>Add Cancelled Date</label>
+        <div class="field-row">
+          <input type="date" id="cancel-date">
+          <input type="text" id="cancel-reason" placeholder="e.g. Holiday, College closed">
+        </div>
+        <button class="btn btn-primary btn-block btn-sm" onclick="addCancelledDate()" style="margin-top:8px;">+ Add</button>
+      </div>
+      <div id="cancelled-list"></div>
+    </div>
+  </section>
+
+  <!-- GRADEBOOK TAB -->
+  <section id="tab-gradebook" class="hidden">
+    <div class="card">
+      <h2 class="serif">Gradebook</h2>
+      <div class="tabs">
+        <button class="tab active" data-gb="entry" onclick="switchGradebookTab('entry')">Enter Marks</button>
+        <button class="tab" data-gb="view" onclick="switchGradebookTab('view')">View Marks</button>
+        <button class="tab" data-gb="exams" onclick="switchGradebookTab('exams')">Manage Exams</button>
+      </div>
+      <div id="gradebook-content"></div>
     </div>
   </section>
 
@@ -1038,9 +1119,21 @@ nav.bottom-nav {
     </div>
 
     <div class="card">
+      <h3>Quick Navigation</h3>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+        <button class="btn btn-ghost btn-sm" onclick="navTo('insights')">💡 Insights</button>
+        <button class="btn btn-ghost btn-sm" onclick="navTo('gradebook')">🎓 Gradebook</button>
+        <button class="btn btn-ghost btn-sm" onclick="navTo('timetable')">📅 Timetable</button>
+        <button class="btn btn-ghost btn-sm" onclick="navTo('compare')">📊 Compare</button>
+        <button class="btn btn-ghost btn-sm" onclick="navTo('search')">🔍 Find Student</button>
+        <button class="btn btn-ghost btn-sm" onclick="navTo('history')">📚 History</button>
+      </div>
+    </div>
+
+    <div class="card">
       <h3>About</h3>
       <p style="font-size: 13px; color: var(--ink-muted); margin: 0;">
-        Class Register v2 stores all data locally on this device. No internet connection is required. No data leaves your phone unless you share a backup.
+        Class Register v3 stores all data locally on this device. No internet connection is required. No data leaves your phone unless you share a backup.
       </p>
     </div>
   </section>
@@ -1196,8 +1289,8 @@ nav.bottom-nav {
 
 <script>
 /* ===================== DATA LAYER ===================== */
-const STORAGE_KEY = 'classRegister_v2';
-const LEGACY_KEY = 'classRegister_v1';
+const STORAGE_KEY = 'classRegister_v3';
+const LEGACY_KEYS = ['classRegister_v2', 'classRegister_v1'];
 const PIN_KEY = 'classRegister_pin';
 const AUTOBACKUP_KEY = 'classRegister_autobackup';
 const LAST_BACKUP_KEY = 'classRegister_lastBackup';
@@ -1242,7 +1335,15 @@ const INITIAL_DATA = {
   threshold: 75,
   timetable: [], // [{id, day, start, end, subject, division}]
   professorName: "",
-  collegeName: ""
+  collegeName: "",
+  studentMeta: { A: {}, B: {} }, // { div: { studentName: { customThreshold, marks: [...] } } }
+  examTypes: [
+    { id: 'ca1', name: 'Class Assessment 1', maxMarks: 20 },
+    { id: 'ca2', name: 'Class Assessment 2', maxMarks: 20 },
+    { id: 'midterm', name: 'Mid-term', maxMarks: 50 },
+    { id: 'final', name: 'Final Exam', maxMarks: 100 }
+  ],
+  cancelledDates: [] // [{ id, date, division, subject, reason }]
 };
 
 const ROLL_OFFSET = { A: 1, B: 61 };
@@ -1251,9 +1352,11 @@ function loadData() {
   try {
     let raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) {
-      // Try migrating from v1
-      const legacy = localStorage.getItem(LEGACY_KEY);
-      if (legacy) raw = legacy;
+      // Try migrating from any older version
+      for (const lk of LEGACY_KEYS) {
+        const legacy = localStorage.getItem(lk);
+        if (legacy) { raw = legacy; break; }
+      }
     }
     if (!raw) return JSON.parse(JSON.stringify(INITIAL_DATA));
     const parsed = JSON.parse(raw);
@@ -1262,6 +1365,11 @@ function loadData() {
     if (!parsed.lectures) parsed.lectures = [];
     if (parsed.threshold == null) parsed.threshold = 75;
     if (!parsed.timetable) parsed.timetable = [];
+    if (!parsed.studentMeta) parsed.studentMeta = { A: {}, B: {} };
+    if (!parsed.studentMeta.A) parsed.studentMeta.A = {};
+    if (!parsed.studentMeta.B) parsed.studentMeta.B = {};
+    if (!parsed.examTypes) parsed.examTypes = INITIAL_DATA.examTypes;
+    if (!parsed.cancelledDates) parsed.cancelledDates = [];
     return parsed;
   } catch (e) {
     return JSON.parse(JSON.stringify(INITIAL_DATA));
@@ -1309,11 +1417,11 @@ function escapeHtml(s) {
 function escapeAttr(s) { return escapeHtml(s); }
 
 /* ===================== NAVIGATION ===================== */
-const TABS = ['home', 'mark', 'history', 'reports', 'compare', 'search', 'timetable', 'settings'];
+const TABS = ['home', 'mark', 'history', 'reports', 'compare', 'search', 'timetable', 'insights', 'gradebook', 'settings'];
 
 function navTo(tab) {
   // "More" maps to settings for the 5th bottom nav button
-  const visualTab = ['compare', 'search', 'timetable'].includes(tab) ? null : tab;
+  const visualTab = ['compare', 'search', 'timetable', 'insights', 'gradebook'].includes(tab) ? null : tab;
 
   TABS.forEach(t => {
     const el = document.getElementById('tab-' + t);
@@ -1336,6 +1444,8 @@ function navTo(tab) {
   if (tab === 'compare') renderCompare();
   if (tab === 'search') renderSearch();
   if (tab === 'timetable') renderTimetable();
+  if (tab === 'insights') renderInsights();
+  if (tab === 'gradebook') renderGradebook();
   if (tab === 'settings') renderSettings();
 }
 
@@ -1471,6 +1581,14 @@ function renderMarkForm() {
   document.getElementById('mark-time').value = '';
   document.getElementById('mark-search').value = '';
   document.getElementById('roll-absent').value = '';
+  document.getElementById('mark-makeup').checked = false;
+  document.getElementById('mark-makeup-original').value = '';
+  document.getElementById('makeup-original-wrap').classList.add('hidden');
+
+  // Wire makeup checkbox toggle
+  document.getElementById('mark-makeup').onchange = function() {
+    document.getElementById('makeup-original-wrap').classList.toggle('hidden', !this.checked);
+  };
 
   markState = {};
   markNotes = {};
@@ -1648,6 +1766,8 @@ function saveAttendance() {
   const division = document.getElementById('mark-div').value;
   const subject = document.getElementById('mark-subject').value;
   const time = document.getElementById('mark-time').value.trim();
+  const isMakeup = document.getElementById('mark-makeup').checked;
+  const makeupOriginal = isMakeup ? document.getElementById('mark-makeup-original').value : '';
 
   if (!date) { toast('Please pick a date'); return; }
   if (!subject) { toast('Please pick a subject'); return; }
@@ -1681,12 +1801,15 @@ function saveAttendance() {
     if (!confirm('A lecture with the same date, division, subject and time already exists. Overwrite it?')) return;
     existing.attendance = attendance;
     existing.notes = notes;
+    existing.isMakeup = isMakeup;
+    existing.makeupOriginal = makeupOriginal;
     existing.updatedAt = Date.now();
   } else {
     data.lectures.push({
       id: 'L' + Date.now() + Math.random().toString(36).slice(2, 6),
       date, division, subject, time,
       attendance, notes,
+      isMakeup, makeupOriginal,
       createdAt: Date.now()
     });
   }
@@ -1730,7 +1853,7 @@ function openLectureDetail(id) {
   const absent = total - presentCount;
 
   document.getElementById('detail-title').innerHTML =
-    `${escapeHtml(l.subject)} · Div ${l.division}<br><span style="font-size:13px;color:var(--ink-muted);font-family:Inter;font-weight:400;">${formatDate(l.date)}${l.time ? ' · ' + escapeHtml(l.time) : ''}</span>`;
+    `${escapeHtml(l.subject)} · Div ${l.division}${l.isMakeup ? ' <span class="chip warn">MAKEUP</span>' : ''}<br><span style="font-size:13px;color:var(--ink-muted);font-family:Inter;font-weight:400;">${formatDate(l.date)}${l.time ? ' · ' + escapeHtml(l.time) : ''}${l.isMakeup && l.makeupOriginal ? ' · replacing ' + formatDate(l.makeupOriginal) : ''}</span>`;
 
   const div = l.division;
   const studentList = data.students[div];
@@ -1746,9 +1869,10 @@ function openLectureDetail(id) {
   }).join('');
 
   document.getElementById('detail-content').innerHTML = `
-    <div style="display:flex;gap:8px;margin-bottom:14px;">
+    <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
       <span class="chip green">${presentCount} Present</span>
       <span class="chip red">${absent} Absent</span>
+      <span class="chip info">${total === 0 ? 0 : Math.round(presentCount/total*100)}% attendance</span>
     </div>
     <div class="student-list">${rows}</div>
   `;
@@ -1821,7 +1945,13 @@ function renderReport() {
   if (toDate) lectures = lectures.filter(l => l.date <= toDate);
   const lecturesCount = lectures.length;
 
-  const defaulters = stats.filter(s => s.total > 0 && s.pct < data.threshold);
+  // Per-student threshold check
+  const getEffectiveThreshold = (name) => {
+    const meta = (data.studentMeta[div] && data.studentMeta[div][name]) || {};
+    return meta.customThreshold != null ? meta.customThreshold : data.threshold;
+  };
+
+  const defaulters = stats.filter(s => s.total > 0 && s.pct < getEffectiveThreshold(s.name));
   const withData = stats.filter(s => s.total > 0);
   const avg = withData.length ? withData.reduce((sum, s) => sum + s.pct, 0) / withData.length : 0;
 
@@ -1829,7 +1959,7 @@ function renderReport() {
     <div class="stats-grid">
       <div class="stat"><div class="stat-label">Lectures</div><div class="stat-value">${lecturesCount}</div></div>
       <div class="stat"><div class="stat-label">Avg Attendance</div><div class="stat-value">${lecturesCount === 0 ? '—' : Math.round(avg)}<span class="unit">%</span></div></div>
-      <div class="stat"><div class="stat-label">Defaulters (&lt;${data.threshold}%)</div><div class="stat-value">${defaulters.length}</div></div>
+      <div class="stat"><div class="stat-label">Defaulters</div><div class="stat-value">${defaulters.length}</div></div>
       <div class="stat"><div class="stat-label">Total Students</div><div class="stat-value">${stats.length}</div></div>
     </div>
   `;
@@ -1841,12 +1971,14 @@ function renderReport() {
     return;
   }
   container.innerHTML = sorted.map(s => {
-    const isDef = s.total > 0 && s.pct < data.threshold;
+    const studentThreshold = getEffectiveThreshold(s.name);
+    const isDef = s.total > 0 && s.pct < studentThreshold;
+    const isCustom = studentThreshold !== data.threshold;
     const pctClass = s.total === 0 ? '' : (isDef ? 'bad' : 'good');
     return `
       <div class="report-row ${isDef ? 'defaulter' : ''}" onclick="openStudentDetail('${escapeAttr(s.name)}','${s.roll < ROLL_OFFSET.B ? 'A' : 'B'}')">
         <div class="student-roll">${s.roll}</div>
-        <div class="student-name">${escapeHtml(s.name)}<div style="font-size:11px;color:var(--ink-muted);">${s.present}/${s.total} lectures</div></div>
+        <div class="student-name">${escapeHtml(s.name)}${isCustom ? ' <span class="chip info" style="font-size:9px;padding:1px 6px;">T:'+studentThreshold+'%</span>' : ''}<div style="font-size:11px;color:var(--ink-muted);">${s.present}/${s.total} lectures</div></div>
         <div class="report-pct ${pctClass}">${s.total === 0 ? '—' : s.pct + '%'}</div>
       </div>`;
   }).join('');
@@ -2102,6 +2234,12 @@ function openStudentDetail(name, div) {
   const total = lectures.length;
   const pct = total === 0 ? 0 : Math.round(present / total * 100);
 
+  // Custom threshold
+  const meta = (data.studentMeta[div] && data.studentMeta[div][name]) || {};
+  const customT = meta.customThreshold;
+  const effectiveThreshold = customT != null ? customT : data.threshold;
+  const isDef = total > 0 && pct < effectiveThreshold;
+
   // Per-subject breakdown
   const bySubj = {};
   lectures.forEach(l => {
@@ -2120,7 +2258,7 @@ function openStudentDetail(name, div) {
     return `
       <div class="compare-row">
         <div class="compare-label">${escapeHtml(subj)}</div>
-        <div class="compare-bar-track"><div class="compare-bar-fill ${p < data.threshold ? 'bad' : ''}" style="width:${p}%"></div></div>
+        <div class="compare-bar-track"><div class="compare-bar-fill ${p < effectiveThreshold ? 'bad' : ''}" style="width:${p}%"></div></div>
         <div class="compare-pct">${p}%</div>
       </div>`;
   }).join('');
@@ -2128,19 +2266,53 @@ function openStudentDetail(name, div) {
   const recentRows = lectures.slice(0, 15).map(l => `
     <div class="report-row" style="cursor:default;">
       <div style="flex:1;">
-        <div style="font-weight:600;font-size:13px;">${escapeHtml(l.subject)}</div>
+        <div style="font-weight:600;font-size:13px;">${escapeHtml(l.subject)}${l.isMakeup ? ' <span class="chip warn" style="font-size:9px;padding:2px 6px;">MAKEUP</span>' : ''}</div>
         <div style="font-size:11px;color:var(--ink-muted);">${formatDate(l.date)}${l.time ? ' · ' + escapeHtml(l.time) : ''}</div>
       </div>
       <span class="chip ${l.attendance[name] === 'P' ? 'green' : 'red'}">${l.attendance[name] === 'P' ? 'Present' : 'Absent'}</span>
     </div>`).join('');
 
+  // Marks section
+  const marks = meta.marks || [];
+  let marksSection = '';
+  if (marks.length > 0) {
+    // Group by subject
+    const bySubject = {};
+    marks.forEach(m => {
+      if (!bySubject[m.subject]) bySubject[m.subject] = [];
+      bySubject[m.subject].push(m);
+    });
+    marksSection = `<div class="divider"></div><h3>📚 Marks</h3>`;
+    Object.entries(bySubject).forEach(([subj, ms]) => {
+      const totalO = ms.reduce((s,m) => s + m.obtained, 0);
+      const totalM = ms.reduce((s,m) => s + m.maxMarks, 0);
+      const subjPct = Math.round(totalO/totalM*100);
+      marksSection += `<div style="margin-bottom:10px;"><div style="font-weight:600;font-size:13px;margin-bottom:4px;">${escapeHtml(subj)} <span class="chip">${subjPct}%</span></div>`;
+      ms.forEach(m => {
+        marksSection += `<div class="report-row" style="cursor:default;padding:8px 12px;">
+          <div style="flex:1;font-size:13px;">${escapeHtml(m.examName)}<div style="font-size:11px;color:var(--ink-muted);">${m.date ? formatDate(m.date) : ''}</div></div>
+          <div style="font-family:Fraunces;font-weight:600;font-size:14px;">${m.obtained}<span style="color:var(--ink-muted);font-size:12px;">/${m.maxMarks}</span></div>
+        </div>`;
+      });
+      marksSection += `</div>`;
+    });
+  }
+
   document.getElementById('student-modal-content').innerHTML = `
     <div class="stats-grid" style="margin-bottom:14px;">
-      <div class="stat"><div class="stat-label">Overall</div><div class="stat-value ${pct < data.threshold ? '' : ''}">${total ? pct + '%' : '—'}</div></div>
+      <div class="stat"><div class="stat-label">Overall</div><div class="stat-value">${total ? pct + '%' : '—'}</div></div>
       <div class="stat"><div class="stat-label">Lectures</div><div class="stat-value">${present}/${total}</div></div>
+    </div>
+    <div class="banner ${isDef ? 'warn' : 'info'}" style="margin-bottom:14px;">
+      <div class="banner-msg">
+        <strong>Target attendance: ${effectiveThreshold}%</strong>${customT != null ? ' <span class="chip info" style="font-size:10px;">CUSTOM</span>' : ''}<br>
+        <span style="font-size:11px;">${isDef ? '⚠ Below target' : '✓ Meeting target'}</span>
+      </div>
+      <button onclick="setCustomThreshold('${escapeAttr(name)}','${div}')" class="btn-sm">Set Custom</button>
     </div>
     <h3>By Subject</h3>
     ${subjBreakdown || '<div class="empty">No data yet</div>'}
+    ${marksSection}
     <div class="divider"></div>
     <h3>Recent Lectures</h3>
     ${recentRows || '<div class="empty">No data yet</div>'}
@@ -2941,7 +3113,676 @@ async function lockKeyPress(k) {
   }
 }
 
-/* ===================== INIT ===================== */
+/* ===================== CANCELLED DATES & EFFECTIVE LECTURES ===================== */
+function isCancelled(date, division, subject) {
+  return data.cancelledDates.some(c =>
+    c.date === date &&
+    (!c.division || c.division === division) &&
+    (!c.subject || c.subject === subject)
+  );
+}
+
+function addCancelledDate() {
+  const date = document.getElementById('cancel-date').value;
+  const reason = document.getElementById('cancel-reason').value.trim() || 'Holiday';
+  if (!date) { toast('Pick a date'); return; }
+  if (data.cancelledDates.some(c => c.date === date && !c.division && !c.subject)) {
+    toast('Already marked');
+    return;
+  }
+  data.cancelledDates.push({
+    id: 'C' + Date.now() + Math.random().toString(36).slice(2, 5),
+    date, reason,
+    division: '',  // empty = applies to all divisions
+    subject: ''    // empty = applies to all subjects
+  });
+  saveData();
+  document.getElementById('cancel-date').value = '';
+  document.getElementById('cancel-reason').value = '';
+  renderInsights();
+  toast('Date marked as cancelled');
+}
+
+function removeCancelledDate(id) {
+  if (!confirm('Remove this cancelled date marker?')) return;
+  data.cancelledDates = data.cancelledDates.filter(c => c.id !== id);
+  saveData();
+  renderInsights();
+  toast('Removed');
+}
+
+/* ===================== INSIGHTS ===================== */
+function renderInsights() {
+  const div = document.getElementById('ins-div').value;
+  const window = parseInt(document.getElementById('ins-window').value, 10);
+
+  // Filter relevant lectures, excluding cancelled
+  let lectures = data.lectures
+    .filter(l => l.division === div)
+    .filter(l => !isCancelled(l.date, l.division, l.subject))
+    .sort((a, b) => a.date.localeCompare(b.date) || a.createdAt - b.createdAt);
+
+  const recentLectures = window === 0 ? lectures : lectures.slice(-window);
+
+  renderTrendingDown(div, lectures, recentLectures);
+  renderAbsentStreak(div, lectures);
+  renderDayPatterns(div, lectures);
+  renderCancelledList();
+}
+
+function renderTrendingDown(div, allLectures, recentLectures) {
+  const c = document.getElementById('trending-down');
+  if (recentLectures.length < 3 || allLectures.length < 5) {
+    c.innerHTML = '<div class="empty" style="padding:20px;">Need at least 5 lectures total and 3 recent to detect trends.</div>';
+    return;
+  }
+  const students = data.students[div];
+  const flagged = [];
+  students.forEach((name, idx) => {
+    // Overall %
+    let oP = 0, oT = 0;
+    allLectures.forEach(l => {
+      if (l.attendance.hasOwnProperty(name)) {
+        oT++;
+        if (l.attendance[name] === 'P') oP++;
+      }
+    });
+    // Recent %
+    let rP = 0, rT = 0;
+    recentLectures.forEach(l => {
+      if (l.attendance.hasOwnProperty(name)) {
+        rT++;
+        if (l.attendance[name] === 'P') rP++;
+      }
+    });
+    if (oT < 5 || rT < 3) return;
+    const overall = oP / oT * 100;
+    const recent = rP / rT * 100;
+    const drop = overall - recent;
+    if (drop >= 15) {  // 15+ percentage point drop is meaningful
+      flagged.push({
+        name, roll: getRoll(div, idx),
+        overall: Math.round(overall),
+        recent: Math.round(recent),
+        drop: Math.round(drop)
+      });
+    }
+  });
+  flagged.sort((a, b) => b.drop - a.drop);
+  if (flagged.length === 0) {
+    c.innerHTML = '<div class="empty" style="padding:20px;">✓ No concerning drops detected.</div>';
+    return;
+  }
+  c.innerHTML = flagged.map(s => `
+    <div class="report-row" onclick="openStudentDetail('${escapeAttr(s.name)}','${div}')">
+      <div class="student-roll">${s.roll}</div>
+      <div class="student-name">${escapeHtml(s.name)}<div style="font-size:11px;color:var(--ink-muted);">Overall ${s.overall}% → Recent ${s.recent}%</div></div>
+      <div class="report-pct bad">−${s.drop}%</div>
+    </div>`).join('');
+}
+
+function renderAbsentStreak(div, lectures) {
+  const c = document.getElementById('absent-streak');
+  const students = data.students[div];
+  const sorted = [...lectures].sort((a, b) => b.date.localeCompare(a.date) || b.createdAt - a.createdAt);
+  const streaks = [];
+
+  students.forEach((name, idx) => {
+    let streak = 0;
+    for (const l of sorted) {
+      if (!l.attendance.hasOwnProperty(name)) continue;
+      if (l.attendance[name] === 'A') {
+        streak++;
+      } else {
+        break;
+      }
+    }
+    if (streak >= 3) {
+      streaks.push({ name, roll: getRoll(div, idx), streak });
+    }
+  });
+  streaks.sort((a, b) => b.streak - a.streak);
+  if (streaks.length === 0) {
+    c.innerHTML = '<div class="empty" style="padding:20px;">✓ No student is on a 3+ absence streak.</div>';
+    return;
+  }
+  c.innerHTML = streaks.map(s => `
+    <div class="report-row" onclick="openStudentDetail('${escapeAttr(s.name)}','${div}')">
+      <div class="student-roll">${s.roll}</div>
+      <div class="student-name">${escapeHtml(s.name)}<div style="font-size:11px;color:var(--ink-muted);">Last ${s.streak} consecutive lectures</div></div>
+      <span class="chip red">${s.streak} absent</span>
+    </div>`).join('');
+}
+
+function renderDayPatterns(div, lectures) {
+  const c = document.getElementById('day-patterns');
+  const students = data.students[div];
+  const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+  // For each student, count absences by weekday and total lectures by weekday
+  const findings = [];
+  students.forEach((name, idx) => {
+    const byDay = {};  // day -> {total, absent}
+    let totalLectures = 0, totalAbsent = 0;
+    lectures.forEach(l => {
+      if (!l.attendance.hasOwnProperty(name)) return;
+      const day = new Date(l.date + 'T00:00:00').getDay();
+      if (!byDay[day]) byDay[day] = { total: 0, absent: 0 };
+      byDay[day].total++;
+      totalLectures++;
+      if (l.attendance[name] === 'A') {
+        byDay[day].absent++;
+        totalAbsent++;
+      }
+    });
+    if (totalLectures < 8) return;  // Not enough data
+    const overallAbsentRate = totalAbsent / totalLectures;
+    // Find days where absence rate is significantly higher than overall (and at least 3 lectures on that day)
+    Object.entries(byDay).forEach(([day, v]) => {
+      if (v.total < 3) return;
+      const dayRate = v.absent / v.total;
+      if (dayRate > overallAbsentRate + 0.25 && v.absent >= 2) {
+        findings.push({
+          name, roll: getRoll(div, idx),
+          day: DAYS[parseInt(day)],
+          absent: v.absent,
+          total: v.total,
+          rate: Math.round(dayRate * 100)
+        });
+      }
+    });
+  });
+  findings.sort((a, b) => b.rate - a.rate);
+  if (findings.length === 0) {
+    c.innerHTML = '<div class="empty" style="padding:20px;">✓ No suspicious weekday patterns detected.</div>';
+    return;
+  }
+  c.innerHTML = findings.slice(0, 20).map(f => `
+    <div class="report-row" onclick="openStudentDetail('${escapeAttr(f.name)}','${div}')">
+      <div class="student-roll">${f.roll}</div>
+      <div class="student-name">${escapeHtml(f.name)}<div style="font-size:11px;color:var(--ink-muted);">${f.absent}/${f.total} ${f.day}s missed</div></div>
+      <span class="chip red">${f.rate}% on ${f.day}</span>
+    </div>`).join('');
+}
+
+function renderCancelledList() {
+  const c = document.getElementById('cancelled-list');
+  if (!data.cancelledDates || data.cancelledDates.length === 0) {
+    c.innerHTML = '<div style="font-size:12px;color:var(--ink-muted);padding:6px 0;">No dates marked yet.</div>';
+    return;
+  }
+  const sorted = [...data.cancelledDates].sort((a, b) => b.date.localeCompare(a.date));
+  c.innerHTML = sorted.map(cd => `
+    <div class="list-item">
+      <div style="flex:1;">
+        <div style="font-weight:600;font-size:14px;">${formatDate(cd.date)}</div>
+        <div style="font-size:11px;color:var(--ink-muted);">${escapeHtml(cd.reason)}</div>
+      </div>
+      <button class="icon-btn" onclick="removeCancelledDate('${cd.id}')">🗑</button>
+    </div>`).join('');
+}
+
+/* ===================== WHATSAPP EXPORT ===================== */
+function exportWhatsApp() {
+  const div = document.getElementById('rep-div').value;
+  const subject = document.getElementById('rep-subj').value;
+  const fromDate = document.getElementById('rep-from').value;
+  const toDate = document.getElementById('rep-to').value;
+  const stats = computeStudentStats(div, subject, fromDate, toDate);
+
+  // Use per-student custom thresholds if set
+  const defaulters = stats.filter(s => {
+    if (s.total === 0) return false;
+    const studentMeta = data.studentMeta[div][s.name];
+    const studentThreshold = (studentMeta && studentMeta.customThreshold != null) ? studentMeta.customThreshold : data.threshold;
+    return s.pct < studentThreshold;
+  });
+
+  if (defaulters.length === 0) {
+    toast('No defaulters to share');
+    return;
+  }
+
+  defaulters.sort((a, b) => a.pct - b.pct);
+
+  const periodLabel = (fromDate && toDate) ? `${formatDate(fromDate)} to ${formatDate(toDate)}`
+    : fromDate ? `from ${formatDate(fromDate)}`
+    : toDate ? `up to ${formatDate(toDate)}`
+    : 'overall';
+
+  let msg = `*Attendance Notice — Division ${div}${subject ? ' · ' + subject : ''}*\n`;
+  msg += `_Period: ${periodLabel}_\n`;
+  msg += `_Threshold: ${data.threshold}%_\n\n`;
+  msg += `The following students have attendance below the required threshold and are requested to improve immediately:\n\n`;
+
+  defaulters.forEach((s, i) => {
+    const studentMeta = data.studentMeta[div][s.name];
+    const customT = studentMeta && studentMeta.customThreshold != null ? studentMeta.customThreshold : null;
+    const tNote = customT != null && customT !== data.threshold ? ` (target ${customT}%)` : '';
+    msg += `${i+1}. Roll ${s.roll} - ${s.name} - *${s.pct}%* (${s.present}/${s.total})${tNote}\n`;
+  });
+
+  msg += `\n_Generated via Class Register on ${new Date().toLocaleDateString('en-IN')}_`;
+
+  // Copy to clipboard
+  copyToClipboard(msg).then(() => {
+    toast('Copied! Paste in WhatsApp group.');
+    // Also try opening WhatsApp share
+    setTimeout(() => {
+      if (confirm(`${defaulters.length} defaulters copied to clipboard. Open WhatsApp now to paste?`)) {
+        const encoded = encodeURIComponent(msg);
+        // Try wa.me which works to open WhatsApp
+        window.open(`https://wa.me/?text=${encoded}`, '_blank');
+      }
+    }, 300);
+  }).catch(() => {
+    // Fallback: show in a textarea for manual copy
+    const ta = document.createElement('textarea');
+    ta.value = msg;
+    ta.style.position = 'fixed';
+    ta.style.left = '0';
+    ta.style.top = '0';
+    ta.style.width = '100vw';
+    ta.style.height = '100vh';
+    ta.style.zIndex = '9999';
+    document.body.appendChild(ta);
+    ta.select();
+    alert('Could not auto-copy. The message is now selected — press Ctrl+C/Cmd+C to copy it, then close this alert.');
+    document.body.removeChild(ta);
+  });
+}
+
+function copyToClipboard(text) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    return navigator.clipboard.writeText(text);
+  }
+  return new Promise((resolve, reject) => {
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.left = '-9999px';
+      document.body.appendChild(ta);
+      ta.select();
+      const ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+      ok ? resolve() : reject();
+    } catch (e) { reject(e); }
+  });
+}
+
+/* ===================== GRADEBOOK ===================== */
+let gradebookTab = 'entry';
+
+function switchGradebookTab(t) {
+  gradebookTab = t;
+  document.querySelectorAll('.tab[data-gb]').forEach(tab => tab.classList.toggle('active', tab.dataset.gb === t));
+  renderGradebook();
+}
+
+function renderGradebook() {
+  const c = document.getElementById('gradebook-content');
+  if (gradebookTab === 'entry') renderGradebookEntry(c);
+  else if (gradebookTab === 'view') renderGradebookView(c);
+  else renderGradebookExams(c);
+}
+
+function renderGradebookEntry(c) {
+  const examOpts = data.examTypes.map(e => `<option value="${escapeAttr(e.id)}">${escapeHtml(e.name)} (max ${e.maxMarks})</option>`).join('');
+  const subjOpts = data.subjects.map(s => `<option value="${escapeAttr(s)}">${escapeHtml(s)}</option>`).join('');
+  c.innerHTML = `
+    <div class="field-row">
+      <div class="field">
+        <label>Division</label>
+        <select id="gb-div" onchange="renderGradebookEntryList()">
+          <option value="A">Division A</option>
+          <option value="B">Division B</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Exam</label>
+        <select id="gb-exam" onchange="renderGradebookEntryList()">${examOpts}</select>
+      </div>
+    </div>
+    <div class="field">
+      <label>Subject</label>
+      <select id="gb-subject">${subjOpts}</select>
+    </div>
+    <div class="field">
+      <label>Date</label>
+      <input type="date" id="gb-date" value="${todayISO()}">
+    </div>
+    <div class="search-box">
+      <input type="text" id="gb-search" placeholder="Search student..." oninput="renderGradebookEntryList()">
+    </div>
+    <p style="font-size:12px;color:var(--ink-muted);margin:6px 0 10px;">
+      Type marks into each student's field. Leave blank to skip. Click "Save All" when done.
+    </p>
+    <div id="gb-entry-list" class="student-list"></div>
+    <button class="btn btn-accent btn-block" onclick="saveGradebookEntries()" style="margin-top:12px;">Save All Marks</button>
+  `;
+  renderGradebookEntryList();
+}
+
+function renderGradebookEntryList() {
+  const div = document.getElementById('gb-div').value;
+  const examId = document.getElementById('gb-exam').value;
+  const search = (document.getElementById('gb-search').value || '').trim().toLowerCase();
+  const exam = data.examTypes.find(e => e.id === examId);
+  if (!exam) return;
+  const subject = document.getElementById('gb-subject').value;
+  const students = data.students[div];
+  const list = document.getElementById('gb-entry-list');
+
+  list.innerHTML = students.map((name, idx) => {
+    if (search && !name.toLowerCase().includes(search) && !String(getRoll(div, idx)).includes(search)) return '';
+    // Find existing mark for this exam+subject (for this student)
+    const meta = data.studentMeta[div][name] || {};
+    const marks = meta.marks || [];
+    const existing = marks.find(m => m.examId === examId && m.subject === subject);
+    const existingVal = existing ? existing.obtained : '';
+    return `
+      <div class="student-row">
+        <div class="student-roll">${getRoll(div, idx)}</div>
+        <div class="student-name">${escapeHtml(name)}</div>
+        <input type="number" min="0" max="${exam.maxMarks}" step="0.5" placeholder="/${exam.maxMarks}"
+               data-student="${escapeAttr(name)}"
+               value="${existingVal}"
+               style="width:90px;text-align:center;padding:8px;">
+      </div>`;
+  }).join('') || `<div class="empty">No students match</div>`;
+}
+
+function saveGradebookEntries() {
+  const div = document.getElementById('gb-div').value;
+  const examId = document.getElementById('gb-exam').value;
+  const exam = data.examTypes.find(e => e.id === examId);
+  const subject = document.getElementById('gb-subject').value;
+  const date = document.getElementById('gb-date').value;
+
+  if (!exam) { toast('Pick an exam'); return; }
+  if (!subject) { toast('Pick a subject'); return; }
+  if (!date) { toast('Pick a date'); return; }
+
+  const inputs = document.querySelectorAll('#gb-entry-list input[data-student]');
+  let saved = 0, skipped = 0;
+
+  inputs.forEach(inp => {
+    const name = inp.dataset.student;
+    const valStr = inp.value.trim();
+    if (!data.studentMeta[div][name]) data.studentMeta[div][name] = {};
+    if (!data.studentMeta[div][name].marks) data.studentMeta[div][name].marks = [];
+    const marks = data.studentMeta[div][name].marks;
+
+    if (valStr === '') {
+      skipped++;
+      return;
+    }
+    const obtained = parseFloat(valStr);
+    if (isNaN(obtained) || obtained < 0 || obtained > exam.maxMarks) {
+      skipped++;
+      return;
+    }
+
+    // Find existing or create
+    const existingIdx = marks.findIndex(m => m.examId === examId && m.subject === subject);
+    const record = {
+      examId, examName: exam.name, maxMarks: exam.maxMarks,
+      subject, date, obtained,
+      savedAt: Date.now()
+    };
+    if (existingIdx >= 0) {
+      marks[existingIdx] = record;
+    } else {
+      marks.push(record);
+    }
+    saved++;
+  });
+
+  saveData();
+  toast(`${saved} mark${saved !== 1 ? 's' : ''} saved${skipped ? ' · ' + skipped + ' blank/invalid skipped' : ''}`);
+}
+
+function renderGradebookView(c) {
+  const examOpts = '<option value="">All Exams</option>' + data.examTypes.map(e => `<option value="${escapeAttr(e.id)}">${escapeHtml(e.name)}</option>`).join('');
+  const subjOpts = '<option value="">All Subjects</option>' + data.subjects.map(s => `<option value="${escapeAttr(s)}">${escapeHtml(s)}</option>`).join('');
+  c.innerHTML = `
+    <div class="field-row">
+      <div class="field">
+        <label>Division</label>
+        <select id="gbv-div" onchange="renderGradebookViewList()">
+          <option value="A">Division A</option>
+          <option value="B">Division B</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Exam</label>
+        <select id="gbv-exam" onchange="renderGradebookViewList()">${examOpts}</select>
+      </div>
+    </div>
+    <div class="field">
+      <label>Subject</label>
+      <select id="gbv-subject" onchange="renderGradebookViewList()">${subjOpts}</select>
+    </div>
+    <div style="display:flex;gap:6px;margin-bottom:10px;">
+      <button class="btn btn-ghost btn-sm" onclick="exportGradebookCSV()" style="flex:1;">📄 Export CSV</button>
+    </div>
+    <div id="gbv-summary"></div>
+    <div class="divider"></div>
+    <div id="gbv-list"></div>
+  `;
+  renderGradebookViewList();
+}
+
+function renderGradebookViewList() {
+  const div = document.getElementById('gbv-div').value;
+  const examId = document.getElementById('gbv-exam').value;
+  const subject = document.getElementById('gbv-subject').value;
+  const students = data.students[div];
+
+  const rows = students.map((name, idx) => {
+    const meta = data.studentMeta[div][name] || {};
+    const marks = (meta.marks || []).filter(m => {
+      if (examId && m.examId !== examId) return false;
+      if (subject && m.subject !== subject) return false;
+      return true;
+    });
+    if (marks.length === 0) return { roll: getRoll(div, idx), name, marks: [], avgPct: null };
+    const totalObtained = marks.reduce((s, m) => s + m.obtained, 0);
+    const totalMax = marks.reduce((s, m) => s + m.maxMarks, 0);
+    const avgPct = totalMax === 0 ? 0 : Math.round(totalObtained / totalMax * 100);
+    return { roll: getRoll(div, idx), name, marks, avgPct, totalObtained, totalMax };
+  });
+
+  const withMarks = rows.filter(r => r.avgPct !== null);
+  const summary = document.getElementById('gbv-summary');
+  if (withMarks.length === 0) {
+    summary.innerHTML = '';
+  } else {
+    const classAvg = Math.round(withMarks.reduce((s, r) => s + r.avgPct, 0) / withMarks.length);
+    const highest = withMarks.reduce((m, r) => r.avgPct > m ? r.avgPct : m, 0);
+    const lowest = withMarks.reduce((m, r) => r.avgPct < m ? r.avgPct : m, 100);
+    summary.innerHTML = `
+      <div class="stats-grid">
+        <div class="stat"><div class="stat-label">Students</div><div class="stat-value">${withMarks.length}</div></div>
+        <div class="stat"><div class="stat-label">Class Avg</div><div class="stat-value">${classAvg}<span class="unit">%</span></div></div>
+        <div class="stat"><div class="stat-label">Highest</div><div class="stat-value">${highest}<span class="unit">%</span></div></div>
+        <div class="stat"><div class="stat-label">Lowest</div><div class="stat-value">${lowest}<span class="unit">%</span></div></div>
+      </div>`;
+  }
+
+  const list = document.getElementById('gbv-list');
+  if (rows.every(r => r.marks.length === 0)) {
+    list.innerHTML = '<div class="empty">No marks recorded for this filter</div>';
+    return;
+  }
+  list.innerHTML = rows.map(r => {
+    if (r.marks.length === 0) {
+      return `
+        <div class="report-row">
+          <div class="student-roll">${r.roll}</div>
+          <div class="student-name">${escapeHtml(r.name)}<div style="font-size:11px;color:var(--ink-muted);">No marks yet</div></div>
+          <div class="report-pct" style="color:var(--ink-muted);">—</div>
+        </div>`;
+    }
+    const detail = r.marks.map(m => `${escapeHtml(m.examName)}: ${m.obtained}/${m.maxMarks}`).join(' · ');
+    return `
+      <div class="report-row" onclick="openStudentDetail('${escapeAttr(r.name)}','${div}')">
+        <div class="student-roll">${r.roll}</div>
+        <div class="student-name">${escapeHtml(r.name)}<div style="font-size:11px;color:var(--ink-muted);">${detail}</div></div>
+        <div class="report-pct ${r.avgPct < 35 ? 'bad' : r.avgPct >= 60 ? 'good' : ''}">${r.avgPct}%</div>
+      </div>`;
+  }).join('');
+}
+
+function exportGradebookCSV() {
+  const div = document.getElementById('gbv-div').value;
+  const students = data.students[div];
+
+  // Header: Roll, Name, then one column per (exam, subject) combo
+  const allMarkKeys = new Set();
+  students.forEach(name => {
+    const meta = data.studentMeta[div][name] || {};
+    (meta.marks || []).forEach(m => allMarkKeys.add(`${m.examName}|${m.subject}`));
+  });
+  const keysArr = [...allMarkKeys].sort();
+
+  const header = ['Roll', 'Name', ...keysArr.map(k => k.replace('|', ' - ')), 'Total Obtained', 'Total Max', 'Percentage'];
+  const rows = students.map((name, idx) => {
+    const meta = data.studentMeta[div][name] || {};
+    const marks = meta.marks || [];
+    let totalO = 0, totalM = 0;
+    const cells = keysArr.map(k => {
+      const [exam, subj] = k.split('|');
+      const m = marks.find(x => x.examName === exam && x.subject === subj);
+      if (m) {
+        totalO += m.obtained;
+        totalM += m.maxMarks;
+        return `${m.obtained}/${m.maxMarks}`;
+      }
+      return '';
+    });
+    const pct = totalM === 0 ? '' : Math.round(totalO / totalM * 100) + '%';
+    return [getRoll(div, idx), name, ...cells, totalO || '', totalM || '', pct];
+  });
+  const csv = [header, ...rows].map(r => r.map(csvEscape).join(',')).join('\n');
+  downloadFile(`Gradebook_Div${div}_${todayISO()}.csv`, csv);
+  toast('Gradebook CSV downloaded');
+}
+
+function renderGradebookExams(c) {
+  c.innerHTML = `
+    <p style="font-size:12px;color:var(--ink-muted);margin:0 0 10px;">
+      Define the exams/assessments you grade. These appear in the "Enter Marks" tab.
+    </p>
+    <div class="field-row">
+      <div class="field">
+        <label>Exam Name</label>
+        <input type="text" id="new-exam-name" placeholder="e.g. Unit Test 1">
+      </div>
+      <div class="field">
+        <label>Max Marks</label>
+        <input type="number" id="new-exam-max" min="1" step="1" placeholder="20">
+      </div>
+    </div>
+    <button class="btn btn-primary btn-block btn-sm" onclick="addExamType()" style="margin-bottom:14px;">+ Add Exam Type</button>
+    <div id="exam-types-list"></div>
+  `;
+  renderExamTypesList();
+}
+
+function renderExamTypesList() {
+  const c = document.getElementById('exam-types-list');
+  if (!c) return;
+  c.innerHTML = data.examTypes.map(e => `
+    <div class="list-item">
+      <div style="flex:1;">
+        <div style="font-weight:600;font-size:14px;">${escapeHtml(e.name)}</div>
+        <div style="font-size:11px;color:var(--ink-muted);">Max marks: ${e.maxMarks}</div>
+      </div>
+      <div class="list-item-actions">
+        <button class="icon-btn" onclick="editExamType('${e.id}')">✎</button>
+        <button class="icon-btn" onclick="deleteExamType('${e.id}')">🗑</button>
+      </div>
+    </div>`).join('');
+}
+
+function addExamType() {
+  const name = document.getElementById('new-exam-name').value.trim();
+  const max = parseFloat(document.getElementById('new-exam-max').value);
+  if (!name) { toast('Enter a name'); return; }
+  if (isNaN(max) || max <= 0) { toast('Enter valid max marks'); return; }
+  data.examTypes.push({
+    id: 'e' + Date.now() + Math.random().toString(36).slice(2, 5),
+    name, maxMarks: max
+  });
+  saveData();
+  document.getElementById('new-exam-name').value = '';
+  document.getElementById('new-exam-max').value = '';
+  renderExamTypesList();
+  toast('Exam type added');
+}
+
+function editExamType(id) {
+  const exam = data.examTypes.find(e => e.id === id);
+  if (!exam) return;
+  const newName = prompt('Exam name:', exam.name);
+  if (!newName || !newName.trim()) return;
+  const newMaxStr = prompt('Max marks:', exam.maxMarks);
+  const newMax = parseFloat(newMaxStr);
+  if (isNaN(newMax) || newMax <= 0) { toast('Invalid max marks'); return; }
+  exam.name = newName.trim();
+  exam.maxMarks = newMax;
+  saveData();
+  renderExamTypesList();
+  toast('Exam updated');
+}
+
+function deleteExamType(id) {
+  const exam = data.examTypes.find(e => e.id === id);
+  if (!exam) return;
+  // Check if any marks exist for this exam
+  let inUse = false;
+  ['A', 'B'].forEach(div => {
+    Object.values(data.studentMeta[div] || {}).forEach(meta => {
+      if ((meta.marks || []).some(m => m.examId === id)) inUse = true;
+    });
+  });
+  const msg = inUse
+    ? `"${exam.name}" has saved marks. Delete it? Existing marks are kept but cannot be edited from the entry screen anymore.`
+    : `Delete "${exam.name}"?`;
+  if (!confirm(msg)) return;
+  data.examTypes = data.examTypes.filter(e => e.id !== id);
+  saveData();
+  renderExamTypesList();
+  toast('Exam deleted');
+}
+
+/* ===================== CUSTOM PER-STUDENT THRESHOLD ===================== */
+function setCustomThreshold(name, div) {
+  const meta = data.studentMeta[div][name] || {};
+  const current = meta.customThreshold != null ? meta.customThreshold : '';
+  const input = prompt(
+    `Custom attendance threshold for ${name} (in %).\n\nLeave blank to use the default (${data.threshold}%).\nUseful for students with medical/special circumstances.`,
+    current
+  );
+  if (input === null) return;
+  if (input.trim() === '') {
+    if (data.studentMeta[div][name]) delete data.studentMeta[div][name].customThreshold;
+  } else {
+    const val = parseInt(input, 10);
+    if (isNaN(val) || val < 0 || val > 100) { toast('Enter 0–100'); return; }
+    if (!data.studentMeta[div][name]) data.studentMeta[div][name] = {};
+    data.studentMeta[div][name].customThreshold = val;
+  }
+  saveData();
+  toast('Threshold updated');
+  // Refresh wherever needed
+  if (!document.getElementById('student-modal').classList.contains('show')) return;
+  openStudentDetail(name, div);
+}
+
+
 window.addEventListener('load', async () => {
   if (!localStorage.getItem(STORAGE_KEY)) saveData();
 
