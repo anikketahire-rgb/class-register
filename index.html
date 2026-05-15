@@ -1141,6 +1141,20 @@ nav.bottom-nav {
     </div>
 
     <div class="card">
+      <h2 class="serif">App Updates</h2>
+      <p style="font-size: 13px; color: var(--ink-muted); margin: 0 0 12px;">
+        The app auto-updates when online. If you don't see the latest changes, force a check or refresh.
+      </p>
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        <button class="btn btn-primary btn-block" onclick="checkForUpdates()">🔄 Check for Updates</button>
+        <button class="btn btn-ghost btn-block" onclick="forceFullReload()">⚡ Force Full Refresh</button>
+      </div>
+      <p style="font-size: 11px; color: var(--ink-muted); margin: 10px 0 0;">
+        "Force Full Refresh" clears cached files and reloads from the server. Your data is not affected.
+      </p>
+    </div>
+
+    <div class="card">
       <h3>Quick Navigation</h3>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
         <button class="btn btn-ghost btn-sm" onclick="navTo('insights')">💡 Insights</button>
@@ -4447,11 +4461,106 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 
-// Service worker registration for offline support
+// Service worker registration with update detection
+let _swRegistration = null;
+let _updateAvailable = false;
+
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('sw.js').catch(err => console.warn('SW registration failed', err));
+    navigator.serviceWorker.register('sw.js').then(reg => {
+      _swRegistration = reg;
+
+      // Check for updates immediately when app loads
+      reg.update().catch(() => {});
+
+      // Listen for new service worker installing
+      reg.addEventListener('updatefound', () => {
+        const newWorker = reg.installing;
+        if (!newWorker) return;
+        newWorker.addEventListener('statechange', () => {
+          if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+            // New version available
+            _updateAvailable = true;
+            showUpdateAvailableBanner();
+          }
+        });
+      });
+
+      // Periodically check for updates (every 30 min when app is open)
+      setInterval(() => {
+        reg.update().catch(() => {});
+      }, 30 * 60 * 1000);
+    }).catch(err => console.warn('SW registration failed', err));
+
+    // Reload when new service worker takes control
+    let refreshing = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (refreshing) return;
+      refreshing = true;
+      window.location.reload();
+    });
   });
+}
+
+function showUpdateAvailableBanner() {
+  // Show a sticky banner at top of screen
+  const existing = document.getElementById('update-banner');
+  if (existing) return;
+  const banner = document.createElement('div');
+  banner.id = 'update-banner';
+  banner.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#2d6a4f;color:white;padding:10px 16px;text-align:center;font-size:13px;z-index:9999;display:flex;gap:10px;justify-content:center;align-items:center;box-shadow:0 2px 8px rgba(0,0,0,0.2);';
+  banner.innerHTML = `
+    <span>✨ New version available!</span>
+    <button onclick="applyUpdate()" style="background:white;color:#2d6a4f;border:none;padding:6px 14px;border-radius:6px;font-weight:600;font-size:12px;cursor:pointer;">Update Now</button>
+    <button onclick="this.parentElement.remove()" style="background:transparent;color:white;border:1px solid white;padding:6px 10px;border-radius:6px;font-size:12px;cursor:pointer;">Later</button>
+  `;
+  document.body.appendChild(banner);
+}
+
+function applyUpdate() {
+  if (_swRegistration && _swRegistration.waiting) {
+    _swRegistration.waiting.postMessage({ type: 'SKIP_WAITING' });
+  } else {
+    // Force reload anyway
+    window.location.reload();
+  }
+}
+
+async function checkForUpdates() {
+  if (!_swRegistration) {
+    toast('Update system not available — try a full reload');
+    return;
+  }
+  toast('Checking for updates...');
+  try {
+    await _swRegistration.update();
+    setTimeout(() => {
+      if (!_updateAvailable) {
+        toast('You\'re on the latest version ✓');
+      }
+    }, 2000);
+  } catch (e) {
+    toast('Could not check — are you online?');
+  }
+}
+
+async function forceFullReload() {
+  if (!confirm('Force a complete refresh? This will clear cached files and reload from the server. Use this if updates aren\'t coming through.')) return;
+  try {
+    // Clear all caches
+    if ('caches' in window) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map(k => caches.delete(k)));
+    }
+    // Tell SW to clear too
+    if (_swRegistration && _swRegistration.active) {
+      _swRegistration.active.postMessage({ type: 'CLEAR_CACHE' });
+    }
+    // Hard reload
+    setTimeout(() => window.location.reload(), 300);
+  } catch (e) {
+    window.location.reload();
+  }
 }
 </script>
 </body>
