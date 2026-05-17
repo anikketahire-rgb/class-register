@@ -740,6 +740,38 @@ nav.bottom-nav {
 <!-- TOAST -->
 <div class="toast" id="toast"></div>
 
+<!-- LOGIN / SIGNUP SCREEN -->
+<div class="lock-screen hidden" id="login-screen">
+  <div class="brand serif" style="font-size:32px;margin-bottom:8px;">Class Register<span class="dot" style="color:var(--accent);">.</span></div>
+  <div class="lock-sub" id="login-mode-label">Sign in to sync across devices</div>
+
+  <div style="width:100%;max-width:340px;margin-top:24px;">
+    <div class="field">
+      <label>Email</label>
+      <input type="email" id="login-email" placeholder="you@example.com" autocomplete="email">
+    </div>
+    <div class="field">
+      <label>Password <span id="password-hint" style="text-transform:none;color:var(--ink-muted);font-weight:400;font-size:11px;">(at least 6 characters)</span></label>
+      <input type="password" id="login-password" placeholder="Your password" autocomplete="current-password">
+    </div>
+
+    <div id="login-error" style="font-size:12px;color:var(--absent);margin-bottom:10px;min-height:18px;"></div>
+
+    <button class="btn btn-primary btn-block" id="login-submit-btn" onclick="handleAuthSubmit()" style="margin-bottom:8px;">Sign In</button>
+
+    <div style="text-align:center;font-size:12px;color:var(--ink-muted);margin:8px 0;">
+      <span id="login-toggle-text">New here?</span>
+      <a href="#" onclick="toggleLoginMode();return false;" id="login-toggle-link" style="color:var(--accent);font-weight:600;">Create an account</a>
+    </div>
+
+    <button class="btn btn-ghost btn-block btn-sm" onclick="continueOffline()" style="margin-top:10px;font-size:12px;">Skip — use offline only</button>
+
+    <p style="font-size:11px;color:var(--ink-muted);text-align:center;margin-top:16px;line-height:1.5;">
+      Your data is private to your account. We never see your data or share it.
+    </p>
+  </div>
+</div>
+
 <!-- PIN LOCK -->
 <div class="lock-screen hidden" id="lock-screen">
   <div class="brand serif">Class Register<span class="dot" style="color:var(--accent);">.</span></div>
@@ -1141,6 +1173,11 @@ nav.bottom-nav {
     </div>
 
     <div class="card">
+      <h2 class="serif">☁️ Cloud Sync</h2>
+      <div id="cloud-sync-status"></div>
+    </div>
+
+    <div class="card">
       <h2 class="serif">App Updates</h2>
       <p style="font-size: 13px; color: var(--ink-muted); margin: 0 0 12px;">
         The app auto-updates when online. If you don't see the latest changes, force a check or refresh.
@@ -1353,6 +1390,40 @@ const LEGACY_KEYS = ['classRegister_v2', 'classRegister_v1'];
 const PIN_KEY = 'classRegister_pin';
 const AUTOBACKUP_KEY = 'classRegister_autobackup';
 const LAST_BACKUP_KEY = 'classRegister_lastBackup';
+const DEVICE_ID_KEY = 'classRegister_deviceId';
+const DEVICE_NAME_KEY = 'classRegister_deviceName';
+const LAST_SYNC_KEY = 'classRegister_lastSyncFromDrive';
+const LAST_LOCAL_SAVE_KEY = 'classRegister_lastLocalSave';
+
+// Get or create a unique device identifier
+function getDeviceId() {
+  let id = localStorage.getItem(DEVICE_ID_KEY);
+  if (!id) {
+    id = 'D' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    localStorage.setItem(DEVICE_ID_KEY, id);
+  }
+  return id;
+}
+
+function getDeviceName() {
+  let name = localStorage.getItem(DEVICE_NAME_KEY);
+  if (!name) {
+    // Guess from user agent
+    const ua = navigator.userAgent.toLowerCase();
+    if (ua.includes('android')) name = 'Phone';
+    else if (ua.includes('iphone') || ua.includes('ipad')) name = 'iPhone';
+    else if (ua.includes('mac')) name = 'Mac';
+    else if (ua.includes('windows')) name = 'Windows PC';
+    else if (ua.includes('linux')) name = 'Linux';
+    else name = 'Device';
+    localStorage.setItem(DEVICE_NAME_KEY, name);
+  }
+  return name;
+}
+
+function setDeviceName(name) {
+  localStorage.setItem(DEVICE_NAME_KEY, name.trim() || 'Device');
+}
 
 const INITIAL_DATA = {
   students: {
@@ -1437,8 +1508,26 @@ function loadData() {
 
 function saveData() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  localStorage.setItem(LAST_LOCAL_SAVE_KEY, Date.now().toString());
   // Trigger auto-backup if enabled
   triggerAutoBackup();
+}
+
+function buildSyncedPayload() {
+  // Wrap data with metadata for sync purposes
+  const lastLocalSave = parseInt(localStorage.getItem(LAST_LOCAL_SAVE_KEY) || Date.now(), 10);
+  return {
+    _meta: {
+      deviceId: getDeviceId(),
+      deviceName: getDeviceName(),
+      savedAt: lastLocalSave,
+      savedAtISO: new Date(lastLocalSave).toISOString(),
+      lectureCount: data.lectures.length,
+      studentCount: data.students.A.length + data.students.B.length,
+      version: 'v5'
+    },
+    data: data
+  };
 }
 
 let data = loadData();
@@ -2867,12 +2956,24 @@ function restoreBackup(event) {
   reader.onload = e => {
     try {
       const parsed = JSON.parse(e.target.result);
-      if (!parsed.students || !parsed.lectures) throw new Error('Invalid backup');
+      // Handle both wrapped (v5+, with _meta) and unwrapped (v2-v4) formats
+      let inner;
+      if (parsed._meta && parsed.data) {
+        inner = parsed.data;
+      } else if (parsed.students && parsed.lectures) {
+        inner = parsed;
+      } else {
+        throw new Error('Invalid backup');
+      }
+      if (!inner.students || !inner.lectures) throw new Error('Invalid backup structure');
       if (!confirm('This will REPLACE all current data with the backup. Continue?')) return;
-      data = parsed;
+      data = inner;
       if (!data.subjects) data.subjects = ['General Lecture'];
       if (!data.timetable) data.timetable = [];
       if (data.threshold == null) data.threshold = 75;
+      if (!data.studentMeta) data.studentMeta = { A: {}, B: {} };
+      if (!data.examTypes) data.examTypes = INITIAL_DATA.examTypes;
+      if (!data.cancelledDates) data.cancelledDates = [];
       saveData();
       toast('Backup restored');
       navTo('home');
@@ -2973,14 +3074,254 @@ async function triggerAutoBackup() {
       const req = await _autoBackupHandle.requestPermission({ mode: 'readwrite' });
       if (req !== 'granted') return;
     }
-    const filename = `ClassRegister_Backup_${todayISO()}.json`;
-    const fileHandle = await _autoBackupHandle.getFileHandle(filename, { create: true });
-    const writable = await fileHandle.createWritable();
-    await writable.write(JSON.stringify(data, null, 2));
-    await writable.close();
+
+    const payload = buildSyncedPayload();
+    const jsonStr = JSON.stringify(payload, null, 2);
+
+    // Write to current.json — the "live" copy used for sync
+    const currentHandle = await _autoBackupHandle.getFileHandle('current.json', { create: true });
+    const currentWritable = await currentHandle.createWritable();
+    await currentWritable.write(jsonStr);
+    await currentWritable.close();
+
+    // Also write a daily archive (overwrites within same day)
+    const archiveName = `archive-${todayISO()}.json`;
+    try {
+      const archiveHandle = await _autoBackupHandle.getFileHandle(archiveName, { create: true });
+      const archiveWritable = await archiveHandle.createWritable();
+      await archiveWritable.write(jsonStr);
+      await archiveWritable.close();
+    } catch (archiveErr) {
+      console.warn('Archive write failed (non-fatal)', archiveErr);
+    }
+
     localStorage.setItem(LAST_BACKUP_KEY, Date.now().toString());
   } catch (e) {
     console.warn('Auto-backup failed', e);
+  }
+}
+
+/* ===================== DRIVE SYNC (Layer 6) ===================== */
+// Reads current.json from the auto-backup folder, decides if a sync is needed.
+// Returns null if no sync needed; otherwise returns the remote payload.
+async function readRemoteSyncFile() {
+  if (!_autoBackupHandle) return null;
+  try {
+    const perm = await _autoBackupHandle.queryPermission({ mode: 'readwrite' });
+    if (perm !== 'granted') return null;
+
+    let fileHandle;
+    try {
+      fileHandle = await _autoBackupHandle.getFileHandle('current.json', { create: false });
+    } catch (e) {
+      // No current.json yet — first time setup
+      return null;
+    }
+    const file = await fileHandle.getFile();
+    const text = await file.text();
+    const parsed = JSON.parse(text);
+    return parsed;
+  } catch (e) {
+    console.warn('Could not read remote sync file', e);
+    return null;
+  }
+}
+
+// Save a "before-sync" snapshot to the Drive folder for safety
+async function saveBeforeSyncSnapshot() {
+  if (!_autoBackupHandle) return;
+  try {
+    const payload = buildSyncedPayload();
+    const ts = Date.now();
+    const filename = `before-sync-${getDeviceName().replace(/\s+/g, '_')}-${ts}.json`;
+    const handle = await _autoBackupHandle.getFileHandle(filename, { create: true });
+    const writable = await handle.createWritable();
+    await writable.write(JSON.stringify(payload, null, 2));
+    await writable.close();
+
+    // Clean up old before-sync files (keep only last 5)
+    await cleanupOldBeforeSyncFiles();
+  } catch (e) {
+    console.warn('Could not save before-sync snapshot', e);
+  }
+}
+
+async function cleanupOldBeforeSyncFiles() {
+  if (!_autoBackupHandle) return;
+  try {
+    const files = [];
+    for await (const [name, handle] of _autoBackupHandle.entries()) {
+      if (name.startsWith('before-sync-') && name.endsWith('.json')) {
+        files.push({ name, handle });
+      }
+    }
+    // Sort by name (which contains timestamp), keep last 5
+    files.sort((a, b) => a.name.localeCompare(b.name));
+    while (files.length > 5) {
+      const old = files.shift();
+      try {
+        await _autoBackupHandle.removeEntry(old.name);
+      } catch (e) {}
+    }
+  } catch (e) {
+    console.warn('Cleanup failed', e);
+  }
+}
+
+// Compare remote and local; decide what to do
+async function checkSyncStatus() {
+  if (!_autoBackupHandle) return { status: 'no-folder' };
+
+  const remote = await readRemoteSyncFile();
+  if (!remote || !remote._meta) {
+    return { status: 'no-remote' };
+  }
+
+  const remoteTime = remote._meta.savedAt;
+  const localTime = parseInt(localStorage.getItem(LAST_LOCAL_SAVE_KEY) || '0', 10);
+  const remoteDevice = remote._meta.deviceId;
+  const localDevice = getDeviceId();
+
+  // If remote was last written by THIS device, no sync needed
+  if (remoteDevice === localDevice && remoteTime <= localTime + 5000) {
+    return { status: 'same-device', remote };
+  }
+
+  // Remote is newer than local
+  if (remoteTime > localTime + 5000) {  // 5sec tolerance for clock skew
+    return { status: 'remote-newer', remote, localTime, remoteTime };
+  }
+
+  // Local is newer (or equal) than remote
+  if (localTime > remoteTime + 5000) {
+    return { status: 'local-newer', remote, localTime, remoteTime };
+  }
+
+  return { status: 'in-sync', remote };
+}
+
+// Apply a remote sync (overwrite local data)
+async function applyRemoteSync(remote) {
+  if (!remote || !remote.data) {
+    toast('Invalid sync data');
+    return false;
+  }
+
+  // First save current state to Drive as safety backup
+  await saveBeforeSyncSnapshot();
+
+  // Replace local data
+  data = remote.data;
+  // Ensure all fields exist
+  if (!data.studentMeta) data.studentMeta = { A: {}, B: {} };
+  if (!data.examTypes) data.examTypes = INITIAL_DATA.examTypes;
+  if (!data.cancelledDates) data.cancelledDates = [];
+  if (!data.timetable) data.timetable = [];
+
+  // Save locally — but mark this save as coming from remote
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  localStorage.setItem(LAST_LOCAL_SAVE_KEY, remote._meta.savedAt.toString());
+  localStorage.setItem(LAST_SYNC_KEY, Date.now().toString());
+
+  return true;
+}
+
+// Show the sync prompt modal when remote is newer
+function showRemoteNewerPrompt(syncStatus) {
+  const remote = syncStatus.remote;
+  const localCount = data.lectures.length;
+  const remoteCount = remote._meta.lectureCount;
+  const diff = remoteCount - localCount;
+  const remoteDevice = remote._meta.deviceName || 'another device';
+  const remoteWhen = new Date(remote._meta.savedAt).toLocaleString('en-IN', {
+    dateStyle: 'medium', timeStyle: 'short'
+  });
+
+  const modalHTML = `
+    <div class="modal-overlay show" id="sync-prompt-modal" style="display:flex;">
+      <div class="modal">
+        <h3>📲 Sync from Drive?</h3>
+        <div class="banner info" style="margin-bottom: 14px;">
+          <div class="banner-msg">
+            <strong>Newer data found in Drive</strong><br>
+            <span style="font-size:11px;">Last edit: ${escapeHtml(remoteDevice)}, ${remoteWhen}</span>
+          </div>
+        </div>
+        <div style="background: var(--bg-soft); padding: 12px; border-radius: 8px; font-size: 13px; line-height: 1.6; margin-bottom: 14px;">
+          <strong>If you sync:</strong><br>
+          • This device (${escapeHtml(getDeviceName())}) will switch to the cloud version<br>
+          • Current local data: <strong>${localCount} lectures</strong><br>
+          • Cloud version: <strong>${remoteCount} lectures</strong> ${diff > 0 ? '<span style="color:var(--present);">(+' + diff + ')</span>' : diff < 0 ? '<span style="color:var(--absent);">(' + diff + ')</span>' : ''}<br>
+          • A safety backup of your current data is saved to Drive first<br>
+        </div>
+        ${diff < 0 ? '<div class="banner warn" style="margin-bottom: 14px;"><div class="banner-msg"><strong>⚠ Heads up:</strong> The cloud version has FEWER lectures. If you sync, you may lose recent local edits. Tap "Skip This Time" if you\'re not sure.</div></div>' : ''}
+        <div style="display: flex; gap: 8px;">
+          <button class="btn btn-ghost" onclick="closeSyncPrompt(false)" style="flex:1;">Skip This Time</button>
+          <button class="btn btn-primary" onclick="closeSyncPrompt(true)" style="flex:1;">Sync Now</button>
+        </div>
+      </div>
+    </div>`;
+
+  // Insert into DOM
+  const wrapper = document.createElement('div');
+  wrapper.innerHTML = modalHTML;
+  document.body.appendChild(wrapper.firstElementChild);
+
+  // Store remote for callback
+  window._pendingSyncRemote = remote;
+}
+
+async function closeSyncPrompt(applySync) {
+  const modal = document.getElementById('sync-prompt-modal');
+  if (modal) modal.remove();
+  if (applySync && window._pendingSyncRemote) {
+    const ok = await applyRemoteSync(window._pendingSyncRemote);
+    if (ok) {
+      toast('✓ Synced from Drive');
+      navTo('home');
+    }
+  }
+  window._pendingSyncRemote = null;
+}
+
+// Manual sync trigger from button
+async function manualSyncFromDrive() {
+  if (!_autoBackupHandle) {
+    toast('Set up an auto-backup folder first (Settings)');
+    return;
+  }
+  toast('Checking Drive...');
+  const status = await checkSyncStatus();
+  if (status.status === 'no-remote') {
+    toast('No backup found in Drive folder yet');
+    return;
+  }
+  if (status.status === 'same-device' || status.status === 'in-sync') {
+    toast('✓ Already up to date');
+    return;
+  }
+  if (status.status === 'remote-newer') {
+    showRemoteNewerPrompt(status);
+    return;
+  }
+  if (status.status === 'local-newer') {
+    if (confirm('Your local data is newer than the cloud version. Push your local data to Drive (overwrite cloud)?')) {
+      await triggerAutoBackup();
+      toast('✓ Pushed to Drive');
+    }
+    return;
+  }
+}
+
+// Auto-check on app open
+async function autoSyncCheck() {
+  if (!_autoBackupHandle) return;
+  const status = await checkSyncStatus();
+  if (status.status === 'remote-newer') {
+    showRemoteNewerPrompt(status);
+  } else if (status.status === 'local-newer') {
+    // Quietly push to Drive
+    await triggerAutoBackup();
   }
 }
 
@@ -4562,6 +4903,459 @@ async function forceFullReload() {
     window.location.reload();
   }
 }
+</script>
+
+<!-- ============================================================ -->
+<!-- FIREBASE CLOUD SYNC (Phase 1) -->
+<!-- ============================================================ -->
+<script type="module">
+// Import Firebase SDK from Google's CDN
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
+import {
+  getAuth,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged,
+  setPersistence,
+  browserLocalPersistence
+} from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
+import {
+  getFirestore,
+  doc,
+  getDoc,
+  setDoc,
+  serverTimestamp,
+  enableIndexedDbPersistence
+} from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyAHgSu4-fJ1XTkxDYYzkCAxnAA_9wOVru4",
+  authDomain: "class-register-sync.firebaseapp.com",
+  projectId: "class-register-sync",
+  storageBucket: "class-register-sync.firebasestorage.app",
+  messagingSenderId: "1052726467114",
+  appId: "1:1052726467114:web:4be9d44af3c6e27d408153",
+  measurementId: "G-K838JLY32B"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+// Persist auth state across page reloads (so they stay logged in)
+setPersistence(auth, browserLocalPersistence).catch(err => console.warn('Auth persistence failed', err));
+
+// Enable offline caching of Firestore data
+enableIndexedDbPersistence(db).catch(err => {
+  if (err.code === 'failed-precondition') {
+    console.warn('Multiple tabs open — offline persistence disabled');
+  } else if (err.code === 'unimplemented') {
+    console.warn('Browser does not support offline Firestore');
+  }
+});
+
+// Make Firebase methods available to the main script (which is not a module)
+window._fb = {
+  auth,
+  db,
+  signInWithEmailAndPassword: (email, pwd) => signInWithEmailAndPassword(auth, email, pwd),
+  createUserWithEmailAndPassword: (email, pwd) => createUserWithEmailAndPassword(auth, email, pwd),
+  signOut: () => signOut(auth),
+  onAuthStateChanged: (cb) => onAuthStateChanged(auth, cb),
+  getUserDoc: (uid) => doc(db, 'users', uid, 'data', 'main'),
+  getDoc,
+  setDoc,
+  serverTimestamp
+};
+
+// Tell the main app Firebase is ready
+window.dispatchEvent(new Event('firebase-ready'));
+</script>
+
+<!-- Main app's sync handlers (in normal script tag so it can reference window functions) -->
+<script>
+/* ===================== FIREBASE SYNC INTEGRATION ===================== */
+let _currentUser = null;
+let _loginMode = 'signin'; // 'signin' or 'signup'
+let _cloudSyncEnabled = false;
+let _lastCloudPull = null;
+let _lastCloudPush = null;
+let _isSyncing = false;
+
+// Wait for Firebase to be ready
+window.addEventListener('firebase-ready', () => {
+  // Set up auth state listener
+  window._fb.onAuthStateChanged(user => {
+    if (user) {
+      _currentUser = user;
+      _cloudSyncEnabled = true;
+      hideLoginScreen();
+      // Pull latest from cloud on login
+      pullFromCloud();
+    } else {
+      _currentUser = null;
+      _cloudSyncEnabled = false;
+      // Don't auto-show login if user already opted to use offline
+      if (localStorage.getItem('classRegister_offlineMode') === 'true') {
+        return;
+      }
+      showLoginScreen();
+    }
+    renderCloudSyncStatus();
+  });
+});
+
+function showLoginScreen() {
+  document.getElementById('login-screen').classList.remove('hidden');
+  // Hide PIN screen if showing
+  document.getElementById('lock-screen').classList.add('hidden');
+  setLoginMode('signin');
+}
+
+function hideLoginScreen() {
+  document.getElementById('login-screen').classList.add('hidden');
+  localStorage.removeItem('classRegister_offlineMode');
+  // If PIN is set, show it now
+  if (hasPin() && !_pinUnlockedThisSession) {
+    showLockScreen();
+  }
+}
+
+let _pinUnlockedThisSession = false;
+// Patch hideLockScreen to remember unlock
+const _originalHideLockScreen = window.hideLockScreen;
+window.hideLockScreen = function() {
+  _pinUnlockedThisSession = true;
+  if (_originalHideLockScreen) _originalHideLockScreen();
+  else document.getElementById('lock-screen').classList.add('hidden');
+};
+
+function setLoginMode(mode) {
+  _loginMode = mode;
+  const submitBtn = document.getElementById('login-submit-btn');
+  const toggleText = document.getElementById('login-toggle-text');
+  const toggleLink = document.getElementById('login-toggle-link');
+  const modeLabel = document.getElementById('login-mode-label');
+  const passwordHint = document.getElementById('password-hint');
+  const passwordField = document.getElementById('login-password');
+
+  if (mode === 'signup') {
+    submitBtn.textContent = 'Create Account';
+    toggleText.textContent = 'Already have an account?';
+    toggleLink.textContent = 'Sign in';
+    modeLabel.textContent = 'Create a new account';
+    passwordHint.style.display = 'inline';
+    passwordField.setAttribute('autocomplete', 'new-password');
+  } else {
+    submitBtn.textContent = 'Sign In';
+    toggleText.textContent = 'New here?';
+    toggleLink.textContent = 'Create an account';
+    modeLabel.textContent = 'Sign in to sync across devices';
+    passwordHint.style.display = 'none';
+    passwordField.setAttribute('autocomplete', 'current-password');
+  }
+  document.getElementById('login-error').textContent = '';
+}
+window.setLoginMode = setLoginMode;
+
+window.toggleLoginMode = function() {
+  setLoginMode(_loginMode === 'signin' ? 'signup' : 'signin');
+};
+
+window.handleAuthSubmit = async function() {
+  const email = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-password').value;
+  const errorEl = document.getElementById('login-error');
+  const submitBtn = document.getElementById('login-submit-btn');
+
+  errorEl.textContent = '';
+
+  if (!email || !email.includes('@')) {
+    errorEl.textContent = 'Please enter a valid email';
+    return;
+  }
+  if (!password) {
+    errorEl.textContent = 'Please enter your password';
+    return;
+  }
+  if (_loginMode === 'signup' && password.length < 6) {
+    errorEl.textContent = 'Password must be at least 6 characters';
+    return;
+  }
+
+  submitBtn.disabled = true;
+  submitBtn.textContent = _loginMode === 'signup' ? 'Creating account...' : 'Signing in...';
+
+  try {
+    if (_loginMode === 'signup') {
+      await window._fb.createUserWithEmailAndPassword(email, password);
+      // On signup, if user has existing local data, offer to migrate
+      if (data.lectures.length > 0 || data.subjects.length > 1 ||
+          Object.keys(data.studentMeta.A || {}).length > 0 ||
+          Object.keys(data.studentMeta.B || {}).length > 0) {
+        setTimeout(() => {
+          if (confirm('You have existing local data on this device. Upload it to your new cloud account?\n\nThis will become your starting point in the cloud.')) {
+            pushToCloud();
+          }
+        }, 500);
+      }
+    } else {
+      await window._fb.signInWithEmailAndPassword(email, password);
+    }
+    // onAuthStateChanged will handle the rest
+  } catch (err) {
+    submitBtn.disabled = false;
+    submitBtn.textContent = _loginMode === 'signup' ? 'Create Account' : 'Sign In';
+    errorEl.textContent = friendlyAuthError(err.code) || err.message;
+  }
+};
+
+function friendlyAuthError(code) {
+  const map = {
+    'auth/invalid-email': 'Invalid email address',
+    'auth/user-not-found': 'No account found with this email',
+    'auth/wrong-password': 'Wrong password',
+    'auth/invalid-credential': 'Wrong email or password',
+    'auth/email-already-in-use': 'An account with this email already exists. Try signing in instead.',
+    'auth/weak-password': 'Password must be at least 6 characters',
+    'auth/network-request-failed': 'No internet — check your connection',
+    'auth/too-many-requests': 'Too many attempts. Try again in a few minutes.'
+  };
+  return map[code];
+}
+
+window.continueOffline = function() {
+  localStorage.setItem('classRegister_offlineMode', 'true');
+  document.getElementById('login-screen').classList.add('hidden');
+  toast('Using offline mode. Sign in later from Settings to enable sync.');
+  if (hasPin()) showLockScreen();
+};
+
+/* ===================== CLOUD SYNC LOGIC ===================== */
+async function pullFromCloud() {
+  if (!_currentUser || _isSyncing) return;
+  _isSyncing = true;
+  updateSyncIndicator('Syncing...');
+  try {
+    const docRef = window._fb.getUserDoc(_currentUser.uid);
+    const docSnap = await window._fb.getDoc(docRef);
+
+    if (!docSnap.exists()) {
+      // First time login — no cloud data yet. Push current local data up.
+      if (data.lectures.length > 0 || data.subjects.length > 1) {
+        await pushToCloud();
+      }
+      _isSyncing = false;
+      updateSyncIndicator('✓ Synced');
+      return;
+    }
+
+    const cloudPayload = docSnap.data();
+    const cloudData = cloudPayload.data;
+    const cloudUpdatedAt = cloudPayload.updatedAt || 0;
+    const cloudSavedFrom = cloudPayload.savedFrom || 'another device';
+
+    if (!cloudData || !cloudData.lectures) {
+      _isSyncing = false;
+      updateSyncIndicator('✓ Synced');
+      return;
+    }
+
+    // Compare timestamps
+    const localSavedAt = parseInt(localStorage.getItem(LAST_LOCAL_SAVE_KEY) || '0', 10);
+    const cloudTime = typeof cloudUpdatedAt === 'object' && cloudUpdatedAt.toMillis ? cloudUpdatedAt.toMillis() : cloudUpdatedAt;
+
+    // If cloud is meaningfully newer (>30 sec)
+    if (cloudTime > localSavedAt + 30000) {
+      const localLectureCount = data.lectures.length;
+      const cloudLectureCount = cloudData.lectures.length;
+
+      // If huge difference, prompt user
+      if (Math.abs(cloudLectureCount - localLectureCount) > 5 && localLectureCount > 0) {
+        if (!confirm(`Cloud has ${cloudLectureCount} lectures, this device has ${localLectureCount}.\n\nLast cloud edit was from "${cloudSavedFrom}".\n\nReplace local data with cloud?`)) {
+          _isSyncing = false;
+          updateSyncIndicator('⚠ Out of sync');
+          return;
+        }
+      }
+
+      // Apply cloud data
+      data = cloudData;
+      if (!data.studentMeta) data.studentMeta = { A: {}, B: {} };
+      if (!data.examTypes) data.examTypes = INITIAL_DATA.examTypes;
+      if (!data.cancelledDates) data.cancelledDates = [];
+      if (!data.timetable) data.timetable = [];
+
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      localStorage.setItem(LAST_LOCAL_SAVE_KEY, cloudTime.toString());
+      _lastCloudPull = Date.now();
+      updateSyncIndicator('✓ Synced from cloud');
+
+      // Re-render current view
+      if (document.getElementById('tab-home') && !document.getElementById('tab-home').classList.contains('hidden')) {
+        renderHome();
+      }
+    } else if (localSavedAt > cloudTime + 30000) {
+      // Local is newer — push up
+      await pushToCloud();
+    } else {
+      _lastCloudPull = Date.now();
+      updateSyncIndicator('✓ Up to date');
+    }
+  } catch (err) {
+    console.warn('Pull failed', err);
+    updateSyncIndicator('⚠ Sync failed');
+  }
+  _isSyncing = false;
+  renderCloudSyncStatus();
+}
+
+async function pushToCloud() {
+  if (!_currentUser || _isSyncing) return;
+  _isSyncing = true;
+  updateSyncIndicator('Saving to cloud...');
+  try {
+    const docRef = window._fb.getUserDoc(_currentUser.uid);
+    await window._fb.setDoc(docRef, {
+      data: data,
+      updatedAt: Date.now(),
+      savedFrom: getDeviceName() || 'Unknown device',
+      deviceId: getDeviceId(),
+      version: 'v6'
+    });
+    _lastCloudPush = Date.now();
+    updateSyncIndicator('✓ Saved to cloud');
+  } catch (err) {
+    console.warn('Push failed', err);
+    updateSyncIndicator('⚠ Save failed (will retry)');
+    // Queue retry
+    setTimeout(() => {
+      if (_currentUser && !_isSyncing) pushToCloud();
+    }, 30000);
+  }
+  _isSyncing = false;
+  renderCloudSyncStatus();
+}
+
+// Hook into saveData to also push to cloud
+const _originalSaveData = window.saveData;
+window.saveData = function() {
+  if (_originalSaveData) _originalSaveData();
+  else {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    localStorage.setItem(LAST_LOCAL_SAVE_KEY, Date.now().toString());
+  }
+  // Push to cloud (debounced)
+  if (_cloudSyncEnabled && _currentUser) {
+    clearTimeout(window._cloudPushTimer);
+    window._cloudPushTimer = setTimeout(() => pushToCloud(), 2000);
+  }
+};
+
+function updateSyncIndicator(msg) {
+  // Update the brand area or a dedicated indicator
+  // For now, just update the cloud sync status if visible
+  const statusEl = document.getElementById('cloud-sync-status');
+  if (statusEl && _currentUser) {
+    renderCloudSyncStatus();
+  }
+}
+
+window.renderCloudSyncStatus = function() {
+  const c = document.getElementById('cloud-sync-status');
+  if (!c) return;
+
+  if (!_currentUser) {
+    // Not logged in
+    if (localStorage.getItem('classRegister_offlineMode') === 'true') {
+      c.innerHTML = `
+        <div class="banner info" style="margin-bottom:12px;">
+          <div class="banner-msg">
+            <strong>📵 Offline mode</strong><br>
+            <span style="font-size:11px;">Sign in to sync between your phone and laptop.</span>
+          </div>
+        </div>
+        <button class="btn btn-primary btn-block" onclick="window.signInFromSettings()">Sign In / Create Account</button>
+      `;
+    } else {
+      c.innerHTML = `
+        <div class="banner warn" style="margin-bottom:12px;">
+          <div class="banner-msg">
+            <strong>Not signed in</strong>
+          </div>
+        </div>
+        <button class="btn btn-primary btn-block" onclick="window.signInFromSettings()">Sign In</button>
+      `;
+    }
+    return;
+  }
+
+  const lastPullStr = _lastCloudPull
+    ? new Date(_lastCloudPull).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
+    : 'never';
+  const lastPushStr = _lastCloudPush
+    ? new Date(_lastCloudPush).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
+    : 'never';
+
+  c.innerHTML = `
+    <div class="banner good" style="margin-bottom:12px;">
+      <div class="banner-msg">
+        <strong>✅ Synced</strong><br>
+        <span style="font-size:11px;">${escapeHtml(_currentUser.email)}</span>
+      </div>
+    </div>
+    <div style="font-size:12px;line-height:1.7;color:var(--ink-soft);margin-bottom:10px;">
+      📤 Last upload: <strong>${lastPushStr}</strong><br>
+      📥 Last download: <strong>${lastPullStr}</strong><br>
+      📱 Device: <strong>${escapeHtml(getDeviceName())}</strong>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px;">
+      <button class="btn btn-ghost btn-sm" onclick="window.manualPullFromCloud()">📥 Pull Now</button>
+      <button class="btn btn-ghost btn-sm" onclick="window.manualPushToCloud()">📤 Push Now</button>
+    </div>
+    <button class="btn btn-danger btn-block btn-sm" onclick="window.signOutFromCloud()">Sign Out</button>
+    <p style="font-size:11px;color:var(--ink-muted);margin-top:10px;">
+      Changes sync automatically. Pull manually if you suspect another device has newer data.
+    </p>
+  `;
+};
+
+window.signInFromSettings = function() {
+  showLoginScreen();
+};
+
+window.manualPullFromCloud = async function() {
+  if (!_currentUser) { toast('Sign in first'); return; }
+  toast('Pulling from cloud...');
+  await pullFromCloud();
+};
+
+window.manualPushToCloud = async function() {
+  if (!_currentUser) { toast('Sign in first'); return; }
+  toast('Pushing to cloud...');
+  await pushToCloud();
+};
+
+window.signOutFromCloud = async function() {
+  if (!confirm('Sign out? Your local data stays on this device. You can sign back in later to sync again.')) return;
+  try {
+    await window._fb.signOut();
+    toast('Signed out');
+    renderCloudSyncStatus();
+  } catch (err) {
+    toast('Sign out failed');
+  }
+};
+
+// Re-render cloud sync status when settings tab is shown
+const _originalNavTo = window.navTo;
+window.navTo = function(tab) {
+  if (_originalNavTo) _originalNavTo(tab);
+  if (tab === 'settings') {
+    setTimeout(() => renderCloudSyncStatus(), 100);
+  }
+};
 </script>
 </body>
 </html>
